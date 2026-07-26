@@ -216,3 +216,32 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# BFR data workflow -- pipeline-specific artifacts
+# ---------------------------------------------------------------------------
+
+# Sabalcore raw outputs (large binaries; not tracked -- see CONTRIBUTING.md
+# image-linking decision: images are referenced by Drive link in
+# data/results.csv, not stored in-repo)
+*.sim
+*.zip
+post_*.zip
+*.png
+*.jpg
+
+# Local staging directories for raw downloads (if/when used)
+/raw/
+/downloads/
+
+# Secrets / credentials -- never commit
+credentials.json
+*.key
+service-account*.json
+.clasp.json
+
+# OS cruft
+.DS_Store
+
+# NOTE: data/*.csv (e.g. data/results.csv) is intentionally tracked --
+# nothing above should be broadened to match *.csv.
