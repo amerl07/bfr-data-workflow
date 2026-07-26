@@ -43,10 +43,16 @@ def parse_sim_filename(filename: str) -> SimFileMetadata:
 def parse_post_zip_filename(filename: str) -> SimFileMetadata:
     """Parse a `post_<job_name>.zip` filename.
 
+    Current scope (see CONTRIBUTING.md): post.zip is the only artifact type
+    this pipeline ingests from Drive -- there is no other file-type pattern
+    to fall back to yet.
+
     TODO: strip the `post_` prefix and `.zip` suffix, then delegate to
     parse_sim_filename() on the remainder. Decide how to handle a filename
-    that doesn't match the expected `post_` / `.zip` wrapper (reject vs. log
-    to the unclassified bucket alongside post_zip_classifier.py's category 6).
+    that doesn't match the expected `post_` / `.zip` wrapper -- given the
+    current scope this represents an anomaly (e.g. a naming mistake) rather
+    than a legitimately different, unsupported file type, so this should
+    likely raise/log loudly rather than route anywhere.
     """
     raise NotImplementedError("post.zip filename parsing not yet implemented")
 

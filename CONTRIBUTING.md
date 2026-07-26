@@ -5,6 +5,15 @@ pipeline. Treat it as a pinned reference, not a one-time announcement --
 update it as new batches surface edge cases (per
 `docs/post_zip_file_format_spec.md`'s own framing).
 
+**Current scope:** the only artifact type currently dropped into Drive batch
+folders is `post_<job_name>.zip`, named per the convention in §2 below. No
+other file types (raw CSVs, `.sim` files, stray images, etc.) are expected
+there yet, and the drive-watcher and `ingestion/parsers/` code are built to
+assume this -- they should not try to generically handle arbitrary file
+types ahead of need. Support for other artifact types -- e.g. a CSV-based
+Bayesian sweep trials log (see the open question in §6) -- is a known future
+extension, not something to build out now.
+
 ## 1. Drive batch-folder convention
 
 Applied at the **batch-folder** level, not to individual files inside it.

@@ -43,3 +43,8 @@ data/
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the living reference on the
 Drive batch-folder convention and the Sabalcore `.sim`/`post.zip` filename
 convention, plus the consolidated list of open questions.
+
+**Current scope:** `post_<job_name>.zip` is the only artifact type this
+pipeline ingests right now -- see the scope note at the top of
+`CONTRIBUTING.md` before adding support for other file types (e.g. a future
+CSV trials log).

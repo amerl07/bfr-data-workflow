@@ -8,6 +8,13 @@
  *      under WATCHED_FOLDER_ID.
  *   2. A new post.zip file added inside an *existing* batch folder (a
  *      grandchild of WATCHED_FOLDER_ID).
+ *
+ * Current scope (see CONTRIBUTING.md): post_<job_name>.zip is the only file
+ * type expected to land inside a batch folder. Nothing else is currently
+ * supported or expected -- isNewPostZipFile should validate the filename
+ * against that convention (post_zip_file_format_spec.md §0), and anything
+ * in the folder that doesn't match is anomalous for now (log/flag it),
+ * not a different file type to route elsewhere.
  */
 
 /**
@@ -32,7 +39,11 @@ function isNewBatchFolder(file) {
 
 /**
  * TODO: implement. True when `file` is a new post.zip created inside an
- * existing batch folder (case 2 above).
+ * existing batch folder (case 2 above) -- i.e. its name matches
+ * `post_<job_name>.zip` per post_zip_file_format_spec.md §0. Per current
+ * scope, this is the only file type ever expected here; a file inside a
+ * batch folder that doesn't match should return false and get logged
+ * upstream as unexpected, not silently accepted.
  * @param {Object} file
  */
 function isNewPostZipFile(file) {
