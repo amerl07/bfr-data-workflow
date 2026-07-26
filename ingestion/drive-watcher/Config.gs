@@ -30,4 +30,4 @@ var PROP_CHANNEL_EXPIRATION = 'DRIVE_WATCH_CHANNEL_EXPIRATION';
  * listChanges() directly if push notifications turn out to be unreliable
  * here.
  */
-var WEBHOOK_URL = 'TODO_DEPLOYED_WEBAPP_EXEC_URL';
+var WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbw-IqHHJrdFuvnVHyxHgn7lGp2U1q2_v5k5T1Ysbd0CcMG5kteQeL07uzSvzmWGLV9T/exec';
