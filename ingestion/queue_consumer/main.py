@@ -335,24 +335,33 @@ def build_result_row(
 
 
 def format_scene_image_refs(classification, filename_to_drive_id):
-    """TODO: not fully implemented, but the harder half of the gap flagged
-    in CONTRIBUTING.md §4 is now resolved: filename_to_drive_id (built by
-    materialize_post_contents, regardless of whether the post job arrived
-    as an already-unzipped Drive folder or a zip that got extracted and
-    re-uploaded) gives a real Drive file id for every scene image filename.
+    """Builds Drive links for every scene image in classification's
+    categories 1-4 (velocity slices, WSS, CP, setup scenes -- per spec §7,
+    not the force report and not the unclassified bucket), using
+    filename_to_drive_id (built by materialize_post_contents, which gives
+    every scene image a real Drive file id regardless of whether the post
+    job arrived as an already-unzipped Drive folder or a zip that got
+    extracted and re-uploaded -- see CONTRIBUTING.md §4).
 
-    What's still missing: post_zip_classifier.py's classify_velocity_slice/
-    classify_wall_shear_stress/classify_pressure_coefficient are themselves
-    still stubs, so the exact shape of the dicts in
-    classification.velocity_slices etc. isn't decided yet -- not something
-    to guess at here. Once it is, this should pull the relevant filenames
-    out of `classification` (categories 1-4 only, per spec §7 -- not the
-    force report, not the unclassified bucket) and look each one up in
-    filename_to_drive_id to build Drive links.
+    A filename missing from filename_to_drive_id (shouldn't normally
+    happen -- classification and filename_to_drive_id are built from the
+    same file listing) is recorded as "MISSING:<name>" rather than silently
+    dropped, so a mismatch is visible in data/results.csv instead of just
+    producing a shorter-than-expected list.
     """
-    raise NotImplementedError(
-        "waiting on post_zip_classifier.py's per-image dict shape -- see this function's docstring"
+    scene_filenames = (
+        [entry["file_name"] for entry in classification.velocity_slices]
+        + [entry["file_name"] for entry in classification.wall_shear_stress]
+        + [entry["file_name"] for entry in classification.pressure_coefficient]
+        + classification.setup_scenes
     )
+
+    links = []
+    for name in scene_filenames:
+        file_id = filename_to_drive_id.get(name)
+        links.append(f"https://drive.google.com/file/d/{file_id}/view" if file_id else f"MISSING:{name}")
+
+    return ";".join(links)
 
 
 def set_status(sheets, row_number, status):

@@ -121,21 +121,22 @@ to downloading copies to a dedicated non-repo destination (e.g. a Drive
 This is explicitly a decision to revisit, not a closed one -- update this
 section if/when that happens.
 
-**Gap discovered while wiring up `ingestion/queue_consumer/`, now mostly
+**Gap discovered while wiring up `ingestion/queue_consumer/`, now fully
 resolved:** this decision assumed each scene image is individually
 addressable on Drive (a file ID/link per image), but scene images
 originally only existed as entries *inside* the `post.zip` archive -- never
 uploaded to Drive as individual files, so there was no per-image Drive link
-to store. Resolved by option (a) below: the queue consumer now extracts and
+to store. Resolved by option (a) below: the queue consumer extracts and
 re-uploads each image from a processed `post.zip` into a sibling
 `<job_name>_extracted` Drive folder, giving every image a real Drive file
 id either way (whether the post job arrived zipped or as an already-unzipped
 folder -- see the Current scope note above and
 `ingestion/drive-watcher/BatchFolderDetector.gs` case 4).
-`format_scene_image_refs` in `ingestion/queue_consumer/main.py` can now
-build real Drive links from that -- what's still blocking it is a separate,
-pre-existing gap: `post_zip_classifier.py`'s per-image dict shape isn't
-decided yet (see §6).
+`format_scene_image_refs` in `ingestion/queue_consumer/main.py` builds
+`scene_image_refs` as a `;`-joined list of Drive view links (categories 1-4
+only -- not the force report, not the unclassified bucket), using
+`post_zip_classifier.py`'s now-decided per-image dict shape (each entry has
+a `file_name` key).
 
 ## 5. `data/results.csv` schema
 
@@ -153,7 +154,7 @@ One row per `post.zip` processed. See
 | `owner_initials` | From filename |
 | `CL`, `CD`, `CoP` | Parsed from `force_reports.txt` (§3.5) |
 | `swept_variable`, `swept_range` | From `force_reports.txt`, **if present** -- unconfirmed, see open questions |
-| `scene_image_refs` | Drive file ID/link per image (§4) -- format undecided, see the gap noted in §4 |
+| `scene_image_refs` | `;`-joined Drive view links, one per scene image (§4) |
 | `source_drive_folder` | Path/link to the originating batch folder |
 
 ## 6. Open questions (consolidated)
@@ -187,13 +188,6 @@ Pulled from `docs/` into one place so they're easy to track:
       (Proposal Outline §6)
 - [ ] Retention policy for `.sim` files (who hosts them, for how long).
       (Proposal Outline §6)
-- [ ] `scene_image_refs` construction: now unblocked on the Drive-linking
-      side (§4), but still waiting on `post_zip_classifier.py`'s
-      `classify_velocity_slice`/`classify_wall_shear_stress`/
-      `classify_pressure_coefficient` to decide the dict shape of
-      `classification.velocity_slices` etc. -- needed so
-      `format_scene_image_refs` knows which filenames to pull out.
-      (`ingestion/queue_consumer/main.py::format_scene_image_refs`)
 
 ## 7. Owner-initials registry
 
