@@ -43,10 +43,26 @@ and the subscription needs periodic renewal. See the module docstring in
 2. **Deploy → New deployment → Web app.** Execute as: Me. Who has access:
    Anyone.
 3. Copy the resulting `/exec` URL into `WEBHOOK_URL` in `Config.gs`.
-4. Run `startWatch()` once from the editor to register the push-notification
-   channel.
-5. Run `installRenewalTrigger()` once to install the daily channel-renewal
-   check.
+4. Run `startWatch()` once **from the Apps Script editor UI** (select it in
+   the function dropdown, click Run) to register the push-notification
+   channel -- see "Running functions" below for why this has to be the
+   editor and not `clasp run`.
+5. Run `installRenewalTrigger()` once, same way, to install the daily
+   channel-renewal check.
+
+## Running functions: editor UI, not `clasp run`
+
+`clasp run-function` (and the underlying Apps Script Execution API,
+`scripts.run`) requires the script to be linked to a **standard Google
+Cloud project**, not the default one Apps Script auto-creates for a new
+`clasp create-script` project. This one is on the default project (confirmed
+via `clasp list-apis` failing with "GCP project ID is not set"), so
+`clasp run-function startWatch` fails with a permission error no matter how
+many times the OAuth consent screen is clicked through in the browser --
+that consent is for the editor's own execution context, not for API-based
+execution. Manually running functions from the Apps Script editor's Run
+button works fine and is the supported path until/unless this project gets
+migrated to a standard GCP project.
 
 ## Header limitation (discovered while implementing `doPost`)
 
