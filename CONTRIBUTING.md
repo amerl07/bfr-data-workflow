@@ -92,8 +92,12 @@ touching `ingestion/parsers/post_zip_classifier.py`. Quick summary:
    meaning (negative vs. zero/positive) is ambiguous and contradicted within
    the one sample batch we have -- do not hardcode a sign rule until
    confirmed against the STAR-CCM+ export macro.
-2. **Wall shear stress** (`WSS_` prefix) -- fixed 8-combination pattern, no
-   ambiguity.
+2. **Wall shear stress** (`WSS_` prefix) -- the original 8-combination
+   quadrant pattern (`WSS_{Top|Bottom}_{Front|Back}_{Right|Left}.png`), plus
+   a per-face overview pattern (`WSS_{Top|Bottom|Right|Left|Front}.png`,
+   mirroring CP_'s overview/quadrant split below) confirmed against a later
+   real upload -- not in the original 76-file sample. Not fixed-count after
+   all; variable like categories 1 and 3.
 3. **Pressure coefficient** (`CP_` prefix) -- per-face and per-quadrant
    scenes. **Open questions:** what distinguishes a `_copy` variant from its
    non-copy counterpart (unconfirmed -- flag for whoever owns the export

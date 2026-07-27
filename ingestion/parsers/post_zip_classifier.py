@@ -5,10 +5,14 @@ flat list of filenames, so it doesn't care which).
 Categories per post_zip_file_format_spec.md §1-6, based on one observed
 76-file batch (docs/PostDotZip_FileNames.txt). Batches may vary -- different
 slice locations, missing/extra views, or file types not seen in that one
-batch are expected. Treat categories 1-3 as variable-count/variable-parameter
-and categories 4-5 as fixed-count/always-present (see spec's "Notes for
-parser design"). Verified against the full 76-file sample batch (zero
-unclassified).
+batch are expected. Confirmed true against a second real batch: WSS_ turned
+out to also have a per-face overview shape (WSS_Top.png etc.) not present
+in the original sample, alongside the quadrant shape -- so treat category 2
+as variable-count too, not just 1-3. Categories 4-5 (setup scenes, force
+report) are still the only ones expected to be fixed-count/always-present
+(see spec's "Notes for parser design"). Verified against the original
+76-file sample batch (zero unclassified) and a second real ~76-file batch
+(zero unclassified once the WSS overview shape was added).
 """
 
 import re
@@ -104,26 +108,41 @@ def classify_velocity_slice(file_name: str) -> Optional[dict]:
     }
 
 
-_WSS_PATTERN = re.compile(
+_WSS_QUADRANT_PATTERN = re.compile(
     r"^WSS_(?P<surface>Top|Bottom)_(?P<position>Front|Back)_(?P<side>Right|Left)\.png$"
 )
+_WSS_OVERVIEW_PATTERN = re.compile(r"^WSS_(?P<surface>Top|Bottom|Right|Left|Front)\.png$")
 
 
 def classify_wall_shear_stress(file_name: str) -> Optional[dict]:
-    """Classify a `WSS_{Surface}_{FrontBack}_{LeftRight}.png` scene.
+    """Classify a `WSS_`-prefixed wall-shear-stress scene.
 
-    Surface in {Top, Bottom}, Position in {Front, Back}, Side in
-    {Right, Left} -- 8 combinations, no ambiguity in the spec (§2).
+    Two shapes, mirroring the CP_ category's overview/quadrant split (§3):
+    - `WSS_{Surface}_{FrontBack}_{LeftRight}.png` -- per-quadrant
+      (Top/Bottom only), Surface in {Top, Bottom}, Position in
+      {Front, Back}, Side in {Right, Left} -- 8 combinations, per the
+      original spec §2 / sample batch.
+    - `WSS_{Surface}.png` -- per-face overview, Surface in {Top, Bottom,
+      Right, Left, Front}. NOT in the original spec or 76-file sample --
+      confirmed against a later real upload (5 files: WSS_Top, WSS_Bottom,
+      WSS_Right, WSS_Left, WSS_Front). Batches vary, per the spec's own
+      framing -- this category isn't fixed-count after all.
     """
-    match = _WSS_PATTERN.match(file_name)
-    if not match:
-        return None
-    return {
-        "file_name": file_name,
-        "surface": match.group("surface"),
-        "position": match.group("position"),
-        "side": match.group("side"),
-    }
+    quadrant_match = _WSS_QUADRANT_PATTERN.match(file_name)
+    if quadrant_match:
+        return {
+            "file_name": file_name,
+            "kind": "quadrant",
+            "surface": quadrant_match.group("surface"),
+            "position": quadrant_match.group("position"),
+            "side": quadrant_match.group("side"),
+        }
+
+    overview_match = _WSS_OVERVIEW_PATTERN.match(file_name)
+    if overview_match:
+        return {"file_name": file_name, "kind": "overview", "surface": overview_match.group("surface")}
+
+    return None
 
 
 _CP_QUADRANT_PATTERN = re.compile(

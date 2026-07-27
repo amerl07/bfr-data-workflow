@@ -60,6 +60,13 @@ WSS_{Surface}_{FrontBack}_{LeftRight}.png
 
 All 2×2×2 = 8 combinations present in this batch.
 
+**Update from a later real batch:** a per-face overview shape also exists —
+`WSS_{Top|Bottom|Right|Left|Front}.png` (5 files: `WSS_Top`, `WSS_Bottom`,
+`WSS_Right`, `WSS_Left`, `WSS_Front`) — mirroring the overview/quadrant
+split already documented for `CP_` below. Not present in this section's
+original 76-file batch. This category is variable-count, not fixed, like
+§1 and §3 — see `ingestion/parsers/post_zip_classifier.py`.
+
 ---
 
 ## 3. Pressure Coefficient (`CP_` prefix)
