@@ -5,18 +5,24 @@
  * WebhookHandler.doPost.
  */
 
-// Renew if the channel expires within this window. Deliberately generous
-// relative to the daily trigger cadence below, so a trigger run that's a
-// bit late (or a single missed run) still catches it before the channel
-// actually expires.
-var RENEWAL_BUFFER_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
+// Renew if the channel expires within this window. Confirmed 2026-07-27:
+// Drive granted this account/resource only ~1 hour of channel lifetime by
+// default (the original "2 days" buffer here was sized for an assumption
+// of a much longer default -- e.g. 24h+ -- that turned out to be wrong,
+// and combined with a daily trigger meant the channel was *always* dead
+// for ~23 hours before the next renewal check even ran). WatchChannel.gs
+// now explicitly requests a 24h expiration, but this buffer/cadence is
+// sized to stay safe even if Drive keeps granting only ~1h regardless.
+var RENEWAL_BUFFER_MS = 25 * 60 * 1000; // 25 minutes
 
 /**
  * One-time manual setup: run this once (from the Apps Script editor -- see
  * ingestion/drive-watcher/README.md's "Running functions" note on why
- * clasp run doesn't work here) to install the daily renewal check.
- * Safe to re-run: clears any existing trigger for renewWatchIfNeeded first
- * so repeated calls don't stack up duplicate triggers.
+ * clasp run doesn't work here) to install the renewal check. Safe to
+ * re-run: clears any existing trigger for renewWatchIfNeeded first so
+ * repeated calls don't stack up duplicate triggers -- re-run this after
+ * changing the trigger cadence below, since installing doesn't happen
+ * automatically on push.
  */
 function installRenewalTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (trigger) {
@@ -25,12 +31,15 @@ function installRenewalTrigger() {
     }
   });
 
+  // 15 minutes: comfortably more frequent than RENEWAL_BUFFER_MS above,
+  // so even the worst-case gap between checks can't let the channel
+  // actually expire before a renewal catches it.
   ScriptApp.newTrigger('renewWatchIfNeeded')
     .timeBased()
-    .everyDays(1)
+    .everyMinutes(15)
     .create();
 
-  Logger.log('Installed daily renewal trigger for renewWatchIfNeeded.');
+  Logger.log('Installed 15-minute renewal trigger for renewWatchIfNeeded.');
 }
 
 /**

@@ -131,6 +131,33 @@ existing deployment (same URL, new version -- no need to change
 `clasp push` to HEAD is not enough on its own for anything reachable via
 the live webhook.
 
+## Watch channels lasted ~1 hour, not the 24h+ assumed -- daily renewal was far too infrequent
+
+Fixing the stale deployment above still didn't get `doPost` firing
+automatically. Turned out to be a second, unrelated problem: checking the
+persisted `DRIVE_WATCH_CHANNEL_EXPIRATION` in Script Properties against
+when it was granted showed Drive giving this account/resource only about
+**one hour** of channel lifetime when `startWatch()` didn't request a
+specific expiration -- confirmed twice (an expired channel, then a freshly
+registered one, both ~1h). `RenewalTrigger.gs`'s original design assumed
+something more like 24h+ and checked only once a day (with a 2-day
+"buffer"), meaning the channel was guaranteed to already be dead for ~23
+hours before the next renewal check even ran -- explaining why every
+upload silently went nowhere until someone manually reran `startWatch()`.
+
+**Fixed** two ways, so it's robust regardless of what Drive actually
+grants: `WatchChannel.gs::startWatch()` now explicitly requests a 24h
+expiration (Google may still cap it lower), and
+`RenewalTrigger.gs::installRenewalTrigger()` now installs a 15-minute
+trigger with a 25-minute buffer instead of daily/2-day -- safe even if
+channels keep coming back at ~1h.
+
+**After this fix, both of these need to be manually re-run once** (same
+"editor UI, not `clasp run`" reasoning as everywhere else in this doc):
+`installRenewalTrigger()` (to replace the old daily trigger -- it doesn't
+update itself just because the code changed) and `startWatch()` (to
+register a channel under the new expiration-requesting logic).
+
 ## Why not a simple time-driven trigger?
 
 Apps Script's easiest option for "run periodically" is a time-driven

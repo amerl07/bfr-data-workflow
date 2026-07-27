@@ -35,19 +35,27 @@ function startWatch() {
 
   var startPageToken = Drive.Changes.getStartPageToken().startPageToken;
 
+  // Explicitly request a long expiration -- confirmed 2026-07-27 that
+  // Drive's default (when this field is omitted) is only ~1 hour for this
+  // account/resource, far shorter than assumed when RenewalTrigger's
+  // cadence was first set. Google may cap this request lower regardless;
+  // channel.expiration below is whatever was actually granted, which is
+  // what gets trusted/stored either way.
+  var requestedExpirationMs = String(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
   var channel = Drive.Changes.watch(
     {
       id: Utilities.getUuid(),
       type: 'web_hook',
-      address: address
+      address: address,
+      expiration: requestedExpirationMs
     },
     startPageToken
   );
 
   // channel.expiration is whatever Google actually assigned (a Unix ms
-  // timestamp, as a string) -- we don't hardcode a ceiling and just trust
-  // this value, which sidesteps needing to confirm Drive's current default
-  // expiration window ahead of time.
+  // timestamp, as a string) -- trusted as-is, whether or not it matches
+  // the requested value above.
   props.setProperty(PROP_CHANNEL_ID, channel.id);
   props.setProperty(PROP_RESOURCE_ID, channel.resourceId);
   props.setProperty(PROP_PAGE_TOKEN, startPageToken);
