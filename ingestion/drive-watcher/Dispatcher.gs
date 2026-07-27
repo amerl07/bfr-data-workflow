@@ -17,18 +17,27 @@ var QUEUE_HEADERS = ['detected_at', 'file_id', 'file_name', 'batch_folder_id', '
  * resource -- see BatchFolderDetector.isNewPostZipFile). `file`'s parent
  * may be a real batch folder, or WATCHED_FOLDER_ID itself if the post.zip
  * was dropped with no batch folder (BatchFolderDetector's case 3) -- in
- * that case batch_folder_name below just ends up as the watched root's own
- * name, which downstream consumers should treat as "no batch folder."
+ * that latter case batch_folder_id/batch_folder_name are left blank
+ * (rather than the watched root's own name, which downstream consumers
+ * would otherwise wrongly try to parse as a batch folder name).
  * @param {Object} file
  */
 function handOffNewFile(file) {
   var sheet = getOrCreateQueueSheet();
-  var batchFolderId = (file.parents || [])[0] || '';
-  var batchFolderName = batchFolderId ? DriveApp.getFolderById(batchFolderId).getName() : '';
+  var parentId = (file.parents || [])[0] || '';
+  var hasBatchFolder = parentId && parentId !== WATCHED_FOLDER_ID;
+  var batchFolderId = hasBatchFolder ? parentId : '';
+  var batchFolderName = hasBatchFolder ? DriveApp.getFolderById(parentId).getName() : '';
 
-  sheet.appendRow([new Date(), file.id, file.name, batchFolderId, batchFolderName, 'pending']);
+  // Utilities.formatDate to a plain string, not a raw Date object -- a
+  // Date passed directly into appendRow's array has been observed to
+  // corrupt the rest of the row (every column ends up holding the same
+  // date serial value instead of the intended distinct values).
+  var timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm:ss");
 
-  Logger.log('Queued %s for processing (batch folder: %s).', file.name, batchFolderName);
+  sheet.appendRow([timestamp, file.id, file.name, batchFolderId, batchFolderName, 'pending']);
+
+  Logger.log('Queued %s for processing (batch folder: %s).', file.name, batchFolderName || '(none)');
 }
 
 /**

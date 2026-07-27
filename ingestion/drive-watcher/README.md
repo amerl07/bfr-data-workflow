@@ -66,6 +66,23 @@ from the editor (same reason as `startWatch`/`installRenewalTrigger` -- see
 "Running functions" below) if you need to (re-)grant the Sheets scope this
 needs.
 
+**Two real bugs found and fixed here (2026-07-27):**
+- `batch_folder_id`/`batch_folder_name` were being set to `WATCHED_FOLDER_ID`
+  itself and its own name whenever a post job was dropped with no batch
+  folder, instead of being left blank. Downstream, that made
+  `ingestion/queue_consumer/` try to run `folder_name_parser` (a stub) on
+  the watched root's name, blocking every loose-drop upload with
+  `folder name parsing not yet implemented` -- even though no batch folder
+  was actually involved. Fixed by checking the immediate parent against
+  `WATCHED_FOLDER_ID` before treating it as a batch folder.
+- `sheet.appendRow([new Date(), ...])` was observed to corrupt the row:
+  every column ended up holding the same date serial value as column A,
+  not the intended distinct values, even though the row read back correctly
+  immediately after being written. Root cause not fully confirmed (isolated
+  Sheets-API-only writes never reproduced it -- see git history for the
+  diagnosis), but switching to a formatted date *string*
+  (`Utilities.formatDate(...)`) instead of a raw `Date` object avoids it.
+
 ## Testing the detection chain
 
 To test: drop a file named `post_<anything>.zip`, or a folder named
