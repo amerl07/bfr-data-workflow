@@ -13,25 +13,26 @@ sample has:
     # raw report values (half-car, undoubled) per BFR_CFD_Standards
     # DF sign convention: downforce reads negative
 
-Confirmed findings from that one sample -- treat as confirmed for this
-format, not guessed, but this is still a single sample:
+Confirmed findings from that one sample, plus decisions made on each
+(2026-07-26) -- treat the findings as confirmed for this format, not
+guessed, but this is still a single sample:
 
 - There is NO CL/CD (dimensionless coefficient) in this file -- only raw
   forces in Newtons ("Total DF", "Total Drag", "Body DF", "RW Drag", "FW
   DF", "RW DF", "UT DF", "Total Aero DF", "Wheel DF", "Whisker DF") plus a
   couple of non-force values ("CoP", "CoP meters", "Cell count"). Computing
   a true CL/CD coefficient needs a reference velocity, reference area, and
-  air density (F = 0.5 * rho * V^2 * A * C) -- none of which appear here.
-  The header's "per BFR_CFD_Standards" reference implies those constants
-  exist somewhere as a team convention, just not in this file. NOT resolved
-  here -- see CONTRIBUTING.md open questions. parse_force_report only
-  returns the raw values; nothing here computes CL/CD.
+  air density (F = 0.5 * rho * V^2 * A * C) -- none of which appear here,
+  and getting those parameters out of the sims is hard for this team right
+  now. DECIDED: store the raw force values instead of CL/CD for now (see
+  data/results.csv's `raw_force_values` column and
+  ingestion/queue_consumer/main.py::format_raw_force_values) -- nothing
+  here computes a coefficient.
 - "CoP" (e.g. 53.437586, unitless) and "CoP meters" (e.g. 0.841642, m) are
-  two different representations of center of pressure in the same file.
-  Which maps to the results.csv `CoP` column -- or whether both should be
-  kept -- isn't fully settled; ForceReportData.CoP currently takes the
-  unitless "CoP" value as the more literal name match, but flag this if
-  that's wrong.
+  two different representations of center of pressure in the same file --
+  the unitless one is a percentage. DECIDED: keep both;
+  ForceReportData.CoP is the percentage, CoP_meters is the absolute
+  distance.
 - swept_variable / swept_range are NOT present anywhere in this file. This
   answers the previously-open question from Proposal Outline §6 / spec §5,
   at least for a single-run export like this one -- ForceReportData always
@@ -39,9 +40,8 @@ format, not guessed, but this is still a single sample:
   come from elsewhere (e.g. the sweep tool's own trials log, per Proposal
   Outline §4.3), not from force_reports.txt.
 - Values are explicitly "half-car, undoubled" per the header comment.
-  Whether to double them for a full-car representation, or store as-is
-  with that noted, is NOT decided here -- parse_force_report returns
-  whatever the file says, unmodified, plus the header note itself
+  DECIDED: leave them as-is for now (no doubling) -- parse_force_report
+  returns whatever the file says, unmodified, plus the header note itself
   (header_notes) so the caveat travels with the data rather than getting
   lost.
 """
@@ -61,13 +61,12 @@ class ForceReportData:
     # important caveats travel with the data instead of being silently lost.
     header_notes: List[str] = field(default_factory=list)
 
-    # Target schema fields (spec §7) -- deliberately left unset by this
-    # parser per the findings above. CL/CD would need a separate
-    # compute-coefficients step once reference constants are known;
-    # swept_variable/swept_range are confirmed absent from this file format.
-    CL: Optional[float] = None
-    CD: Optional[float] = None
-    CoP: Optional[float] = None
+    # Target schema fields (spec §7), per the decisions in this module's
+    # docstring. No CL/CD field -- see data/results.csv's
+    # `raw_force_values` column instead. swept_variable/swept_range are
+    # confirmed absent from this file format.
+    CoP: Optional[float] = None  # percentage
+    CoP_meters: Optional[float] = None
     swept_variable: Optional[str] = None
     swept_range: Optional[str] = None
 
@@ -83,12 +82,10 @@ _VALUE_LINE_PATTERN = re.compile(
 
 
 def parse_force_report(raw_text: str) -> ForceReportData:
-    """Parses the raw label/value/unit rows and header comments.
-
-    Does NOT populate CL/CD/CoP/swept_variable/swept_range in the
-    results.csv sense (beyond the literal "CoP" label) -- see this
-    module's docstring for why those remain open questions rather than
-    something to guess at here.
+    """Parses the raw label/value/unit rows and header comments. See this
+    module's docstring for the decisions behind which fields are/aren't
+    populated (no CL/CD; CoP and CoP_meters both kept; swept_variable/
+    swept_range always None for this format).
     """
     run_name = None
     header_notes: List[str] = []
@@ -127,4 +124,5 @@ def parse_force_report(raw_text: str) -> ForceReportData:
         units=units,
         header_notes=header_notes,
         CoP=raw_values.get("CoP"),
+        CoP_meters=raw_values.get("CoP meters"),
     )

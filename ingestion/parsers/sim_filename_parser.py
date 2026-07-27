@@ -96,29 +96,41 @@ def _parse_job_name(raw_name: str, job_name: str) -> SimFileMetadata:
 
 
 def reconcile_isolated_vs_fullcar(
-    folder_is_full_car: bool, sim_is_isolated: bool
-) -> Optional[bool]:
-    """Reconcile the two independent isolated-vs-fullcar signals.
+    folder_is_full_car: Optional[bool], sim_is_isolated: bool
+) -> str:
+    """Reconcile the two independent isolated-vs-fullcar signals into one
+    of "full_car", "isolated", or a "CONFLICT: ..." string.
 
-    Open question (post_zip_file_format_spec.md §0/§7), NOT resolved here:
-    the Drive batch-folder convention encodes isolated-vs-fullcar via
-    absence of the FC component code, while the Sabalcore .sim filename
-    encodes it via an independent ISO_ prefix on the descriptor (now
-    reliably available as SimFileMetadata.is_isolated, per the parsing
-    above). These are two signals at two different naming layers and are
-    not guaranteed to agree.
+    Background (post_zip_file_format_spec.md §0/§7): the Drive batch-folder
+    convention encodes isolated-vs-fullcar via absence of the FC component
+    code, while the Sabalcore .sim filename encodes it via an independent
+    ISO_ prefix on the descriptor. These are two signals at two different
+    naming layers and are not guaranteed to agree.
 
-    Undecided: should the parser
-      (a) treat the Drive folder name as authoritative and ignore ISO_,
-      (b) treat ISO_ as authoritative, or
-      (c) cross-check both and flag/reject on disagreement?
+    Decision: option (c) from the earlier open question -- cross-check both
+    when both are available, and surface a disagreement rather than
+    silently picking one. `folder_is_full_car` is frequently None now that
+    post.zip can be dropped with no batch folder at all (see CONTRIBUTING.md
+    "Current scope") -- in that case the ISO_/sim signal, which is always
+    available, is used alone since there's nothing to cross-check against.
+    On disagreement, the conflict string itself becomes the CSV row's
+    `isolated_vs_fullcar` value -- visible directly in data/results.csv to
+    whoever reviews it, rather than hidden in a log only.
 
-    This function exists so that decision has one place to land later,
-    rather than being silently baked into folder_name_parser or
-    sim_filename_parser individually.
-
-    TODO: implement once (a)/(b)/(c) above is decided.
+    @param folder_is_full_car: True if the Drive batch folder's component
+        code is FC, False if a non-FC component code is present, None if
+        there's no batch folder to read this from at all.
+    @param sim_is_isolated: SimFileMetadata.is_isolated from the .sim /
+        post.zip filename.
     """
-    raise NotImplementedError(
-        "isolated-vs-fullcar cross-check policy not yet decided"
-    )
+    sim_says_full_car = not sim_is_isolated
+
+    if folder_is_full_car is None:
+        return "full_car" if sim_says_full_car else "isolated"
+
+    if folder_is_full_car == sim_says_full_car:
+        return "full_car" if folder_is_full_car else "isolated"
+
+    folder_label = "full_car" if folder_is_full_car else "isolated"
+    sim_label = "full_car" if sim_says_full_car else "isolated"
+    return f"CONFLICT: folder says {folder_label}, sim ISO_ prefix says {sim_label}"

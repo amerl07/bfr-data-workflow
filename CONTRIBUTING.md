@@ -68,14 +68,18 @@ post_<job_name>.zip
 i.e. `post_<INITIALS>_<descriptor>_<YYYYMMDD>.zip` (or with `ISO_` in the
 descriptor for isolated runs).
 
-**Open question -- FC vs. `ISO_` cross-check:** the Drive folder convention
-(§1) already encodes isolated-vs-fullcar via absence of the `FC` component
-code. The Sabalcore `ISO_` prefix is a second, independent signal for the
-same distinction, at a different naming layer. **Not decided:** whether the
-parser should cross-check these two (folder says isolated, `.sim` name
-should agree) or treat one as authoritative and the other as informal. See
-`ingestion/parsers/sim_filename_parser.py::reconcile_isolated_vs_fullcar`,
-which is stubbed specifically to hold this decision once it's made.
+**FC vs. `ISO_` cross-check (decided):** the Drive folder convention (§1)
+encodes isolated-vs-fullcar via absence of the `FC` component code; the
+Sabalcore `ISO_` prefix is a second, independent signal for the same
+distinction, at a different naming layer. Decision: cross-check both when
+both are available (post.zip is inside a batch folder), and surface a
+disagreement rather than silently picking one -- the `isolated_vs_fullcar`
+column becomes a literal `CONFLICT: folder says ..., sim ISO_ prefix says
+...` string in that case, visible directly in `data/results.csv`. When
+there's no batch folder at all (the common case now -- see "Current scope"
+above), the `ISO_`/sim signal is used alone since there's nothing to
+cross-check against. See
+`ingestion/parsers/sim_filename_parser.py::reconcile_isolated_vs_fullcar`.
 
 ## 3. post.zip file categories (summary)
 
@@ -98,8 +102,9 @@ touching `ingestion/parsers/post_zip_classifier.py`. Quick summary:
 4. **Setup/reference scenes** -- fixed, always-present (`Vector_Scene_1.png`,
    `Mesh.png`, `Geometry.png`).
 5. **Force report** (`force_reports.txt`) -- the one file that gets parsed
-   into structured CL/CD/CoP(/swept-variable/swept-range) rows. Format
-   entirely unconfirmed; no sample available yet.
+   into structured rows. Format confirmed against a real sample: raw force
+   values (Newtons) and two CoP representations, not CL/CD coefficients,
+   and no swept-variable/range. See §5/§6 below for the full detail.
 6. **Unclassified/other** -- catch-all for anything not matching 1-5; must
    be logged with filename + batch folder name rather than silently dropped.
 
@@ -149,11 +154,12 @@ One row per `post.zip` processed. See
 | `post_zip_name` | `post_<job_name>.zip` |
 | `component` | Drive folder name / descriptor (§1) |
 | `sweep_type` | Drive folder name (§1) |
-| `isolated_vs_fullcar` | `FC` absence and/or `ISO_` prefix -- see the cross-check open question in §2 |
+| `isolated_vs_fullcar` | `full_car` / `isolated` / `CONFLICT: ...` -- `FC` absence and/or `ISO_` prefix, cross-checked (§2) |
 | `date` | `YYYYMMDD` from filename |
 | `owner_initials` | From filename |
-| `CL`, `CD` | **Not currently populated** -- `force_reports.txt` only has raw forces (Newtons), not coefficients; computing these needs reference constants not present in the file. See open questions. |
-| `CoP` | Parsed from `force_reports.txt`'s unitless `CoP` label (§3.5) -- there's also a separate `CoP meters` value in the file not currently mapped anywhere; confirm this is the right one |
+| `raw_force_values` | `;`-joined `label=value unit` pairs, everything `force_reports.txt` has (§3.5) -- no CL/CD column; computing a real coefficient needs reference constants not in the file, and getting those out of the sims is hard for this team right now, so raw forces are stored instead. Values are exactly as the file reports them, including its own "half-car, undoubled" convention -- not doubled to a full-car representation. |
+| `CoP` | `force_reports.txt`'s unitless `CoP` label -- a percentage (§3.5) |
+| `CoP_meters` | `force_reports.txt`'s separate `CoP meters` label -- absolute distance in meters (§3.5); kept alongside `CoP` rather than picking one |
 | `swept_variable`, `swept_range` | **Confirmed absent** from `force_reports.txt` (a single-run export has no sweep info at all) -- would need to come from elsewhere, e.g. the sweep tool's own trials log (Proposal Outline §4.3), if captured at all |
 | `scene_image_refs` | `;`-joined Drive view links, one per scene image (§4) |
 | `source_drive_folder` | Path/link to the originating batch folder |
@@ -169,26 +175,16 @@ Pulled from `docs/` into one place so they're easy to track:
       (docs/force_reports.txt): no.** A single-run export has no swept
       variable/range at all -- just raw forces, CoP, and a couple of header
       comments. (Proposal Outline §6, spec §5)
-- [ ] How to get real `CL`/`CD` coefficients: `force_reports.txt` only has
-      raw forces in Newtons ("Total DF", "Total Drag", etc.), not
-      dimensionless coefficients. Computing one needs a reference velocity,
-      reference area, and air density (F = 0.5 · ρ · V² · A · C) -- none of
-      which appear in the file. The file's header references
-      "BFR_CFD_Standards" as the convention these raw values follow,
-      implying such reference constants exist as a team convention
-      somewhere -- need to find/confirm them, or decide to store raw forces
-      in `data/results.csv` instead of coefficients.
-      (`ingestion/parsers/force_reports_parser.py`)
-- [ ] `force_reports.txt` values are explicitly labeled "half-car,
-      undoubled" in the file's own header comment. Whether to double them
-      before storing (to represent the full car) or keep them as-is (with
-      that caveat preserved, e.g. in a notes field) isn't decided.
-      (`ingestion/parsers/force_reports_parser.py`)
-- [ ] `force_reports.txt` has both a unitless `CoP` value and a separate
-      `CoP meters` value. `data/results.csv`'s `CoP` column currently takes
-      the unitless one as the more literal name match -- confirm that's
-      actually the right one, or whether both should be kept.
-      (`ingestion/parsers/force_reports_parser.py`)
+- [x] ~~How to get real `CL`/`CD` coefficients.~~ **Decided: don't, for
+      now.** `force_reports.txt` only has raw forces in Newtons, not
+      coefficients, and getting the reference constants (velocity, area,
+      air density) needed to compute one out of the sims is hard for this
+      team right now -- `data/results.csv` stores `raw_force_values`
+      instead. Revisit if those constants become available.
+- [x] ~~`force_reports.txt` "half-car, undoubled" values -- double or
+      not?~~ **Decided: leave as-is, no doubling, for now.**
+- [x] ~~`CoP` vs. `CoP meters` -- which one?~~ **Decided: keep both.**
+      `CoP` is the percentage, `CoP_meters` is the absolute distance.
 - [ ] `x_`/`y_` slice filename sign convention -- double-underscore means
       negative or zero/positive? Contradicted in the one sample batch.
       (spec §1)
@@ -196,8 +192,6 @@ Pulled from `docs/` into one place so they're easy to track:
       (spec §3)
 - [ ] Is `CpT_Sweep.png` a summary/sweep plot distinct from the directional
       CP scenes, or should it be classified the same way? (spec §3)
-- [ ] FC-absence vs. `ISO_`-prefix cross-check policy -- cross-validate or
-      pick one as authoritative? (spec §0, §7; see §2 above)
 - [ ] Drive push-notification setup: does `script.google.com` work as a
       webhook receiver without extra domain verification for this project's
       setup? (`ingestion/drive-watcher/README.md`)

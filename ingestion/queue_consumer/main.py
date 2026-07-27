@@ -80,9 +80,14 @@ RESULTS_FIELDS = [
     "isolated_vs_fullcar",
     "date",
     "owner_initials",
-    "CL",
-    "CD",
+    # No CL/CD -- force_reports.txt only has raw forces, not coefficients
+    # (no reference velocity/area/air-density to compute one from), and
+    # getting those params out of the sims is hard for this team right now
+    # -- see force_reports_parser.py's docstring. raw_force_values stores
+    # everything force_reports.txt has instead.
+    "raw_force_values",
     "CoP",
+    "CoP_meters",
     "swept_variable",
     "swept_range",
     "scene_image_refs",
@@ -299,9 +304,11 @@ def build_result_row(
     file_name, batch_folder_id, batch_folder_name, file_names, filename_to_drive_id, force_report_text
 ):
     """Runs the materialized post job through ingestion/parsers/ and
-    assembles a data/results.csv row per post_zip_file_format_spec.md §7.
-    Every parser call below is currently a stub (raises NotImplementedError)
-    -- see process_row's handling of that.
+    assembles a data/results.csv row per post_zip_file_format_spec.md §7
+    (as amended -- see RESULTS_FIELDS' raw_force_values comment). Any
+    parser call below still backed by a stub (folder_name_parser, when a
+    batch folder is involved) raises NotImplementedError -- see
+    process_row's handling of that.
     """
     sim_metadata = sim_filename_parser.parse_post_zip_filename(file_name)
 
@@ -327,14 +334,30 @@ def build_result_row(
         "isolated_vs_fullcar": isolated_vs_fullcar,
         "date": sim_metadata.date,
         "owner_initials": sim_metadata.owner_initials,
-        "CL": force_data.CL,
-        "CD": force_data.CD,
+        "raw_force_values": format_raw_force_values(force_data.raw_values, force_data.units),
         "CoP": force_data.CoP,
+        "CoP_meters": force_data.CoP_meters,
         "swept_variable": force_data.swept_variable,
         "swept_range": force_data.swept_range,
         "scene_image_refs": format_scene_image_refs(classification, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
     }
+
+
+def format_raw_force_values(raw_values, units):
+    """Serializes force_reports.txt's raw label/value/unit rows into one
+    ";"-joined "label=value unit" string for the raw_force_values column
+    (see RESULTS_FIELDS' comment on why there's no CL/CD column). A plain
+    join rather than fixed columns per label, since the label set is only
+    confirmed against one sample so far and may not be identical across
+    every component/sweep type (e.g. an isolated rear-wing run likely has
+    no "FW DF" line at all).
+    """
+    parts = []
+    for label, value in raw_values.items():
+        unit = units.get(label, "")
+        parts.append(f"{label}={value}{unit}".rstrip())
+    return ";".join(parts)
 
 
 def format_scene_image_refs(classification, filename_to_drive_id):

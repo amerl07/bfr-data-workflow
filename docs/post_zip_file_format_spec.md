@@ -92,7 +92,7 @@ Fixed, non-parametric reference images — not expected to vary in count batch-t
 
 ## 5. Force Report
 
-- `force_reports.txt` — primary numeric artifact (CL, CD, CoP, swept variable + range per the proposal doc §4.2/§5). This is the one file that gets parsed into structured rows; the text format itself is not yet documented here and should get its own spec once a sample is available (see open question in Proposal Outline §5: "confirm swept parameter ranges are present in solver output").
+- `force_reports.txt` — primary numeric artifact. This is the one file that gets parsed into structured rows. A real sample arrived (docs/force_reports.txt) and confirmed the format: `# `-prefixed header comment lines (including a `run: <name>` identifier, a "half-car, undoubled" note, and a sign-convention note) followed by `<Label>  <value>  <unit>` rows. No CL/CD coefficients and no swept variable/range are present — see CONTRIBUTING.md §5/§6 for the full reasoning and the resulting `data/results.csv` schema.
 
 ---
 
@@ -115,8 +115,8 @@ Confirming the shape of what the parser produces, since this was still implicit.
 | `isolated_vs_fullcar` | From `ISO_` prefix and/or absence of `FC` code — see the cross-check open question in §0 |
 | `date` | `YYYYMMDD` from filename |
 | `owner_initials` | From filename |
-| `CL`, `CD`, `CoP` | Parsed from `force_reports.txt` (category 5) |
-| `swept_variable`, `swept_range` | From `force_reports.txt`, **if present** — still unconfirmed (see Proposal Outline §6 open question) |
+| `raw_force_values`, `CoP`, `CoP_meters` | Parsed from `force_reports.txt` (category 5) — updated after a real sample arrived (docs/force_reports.txt): the file has no CL/CD coefficients, only raw forces in Newtons plus two CoP representations. See CONTRIBUTING.md §5/§6 for the full reasoning. |
+| `swept_variable`, `swept_range` | Confirmed **absent** from `force_reports.txt` (single-run export) — see CONTRIBUTING.md §6 |
 | `scene_image_refs` | Pointers to the categorized images (categories 1–4) — see open question below on link vs. download |
 | `source_drive_folder` | Path/link to the originating batch folder, for traceability |
 

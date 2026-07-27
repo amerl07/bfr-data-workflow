@@ -1,1 +1,1 @@
-job_name,post_zip_name,component,sweep_type,isolated_vs_fullcar,date,owner_initials,CL,CD,CoP,swept_variable,swept_range,scene_image_refs,source_drive_folder
+job_name,post_zip_name,component,sweep_type,isolated_vs_fullcar,date,owner_initials,raw_force_values,CoP,CoP_meters,swept_variable,swept_range,scene_image_refs,source_drive_folder
