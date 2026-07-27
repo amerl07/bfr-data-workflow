@@ -2,8 +2,11 @@
 
 Google Apps Script project that watches the shared Drive folder batch
 outputs get dropped into, and fires (push-based, not polling) when a new
-batch folder or `post.zip` shows up. See file-level TODOs for what's still
-unimplemented -- this is scaffolding, none of the logic runs yet.
+batch folder or `post.zip` shows up.
+
+**Status:** `WatchChannel.gs` and `WebhookHandler.gs` are implemented.
+`ChangeProcessor.gs`, `BatchFolderDetector.gs`, `Dispatcher.gs`, and
+`RenewalTrigger.gs` are still stubs -- see file-level TODOs.
 
 ## Files
 
@@ -12,14 +15,16 @@ unimplemented -- this is scaffolding, none of the logic runs yet.
 - `Config.gs` — `WATCHED_FOLDER_ID`, `WEBHOOK_URL`, and the Script Properties
   keys used to persist watch-channel state across executions.
 - `WatchChannel.gs` — start/stop/check the Drive push-notification channel.
-- `WebhookHandler.gs` — `doPost`, the entry point Drive calls.
-- `ChangeProcessor.gs` — pulls the actual change list once notified.
+  **Implemented.**
+- `WebhookHandler.gs` — `doPost`, the entry point Drive calls. **Implemented**
+  (see "Header limitation" below for a real constraint this works around).
+- `ChangeProcessor.gs` — pulls the actual change list once notified. Stub.
 - `BatchFolderDetector.gs` — filters the account-wide change feed down to
-  events inside `WATCHED_FOLDER_ID`.
+  events inside `WATCHED_FOLDER_ID`. Stub.
 - `Dispatcher.gs` — hands a detected file off to the next stage (mechanism
-  not yet decided — see TODO in the file).
+  not yet decided — see TODO in the file). Stub.
 - `RenewalTrigger.gs` — keeps the watch channel alive (channels expire; this
-  is subscription bookkeeping, not file polling).
+  is subscription bookkeeping, not file polling). Stub.
 
 ## Why not a simple time-driven trigger?
 
@@ -43,13 +48,33 @@ and the subscription needs periodic renewal. See the module docstring in
 5. Run `installRenewalTrigger()` once to install the daily channel-renewal
    check.
 
+## Header limitation (discovered while implementing `doPost`)
+
+Drive push notifications carry their metadata (`X-Goog-Resource-State`,
+`X-Goog-Channel-ID`, `X-Goog-Channel-Token`, etc.) as HTTP headers on the
+notification POST. Apps Script's `doPost(e)` event object has no way to
+read arbitrary request headers -- there's no `e.headers`. This is a real
+platform limitation, not an unconfirmed assumption, and it rules out the
+header-based channel validation originally sketched in this file's TODOs.
+
+**Workaround implemented:** `startWatch()` appends a shared-secret `token`
+query parameter to `WEBHOOK_URL` when registering the channel (persisted as
+`PROP_WEBHOOK_TOKEN`). Query parameters on the notification URL *are*
+readable via `e.parameter` in `doPost`, so `doPost` validates against that
+instead. One side effect: since headers aren't readable, `doPost` also
+can't distinguish the initial `sync` handshake from a real change
+notification -- it doesn't need to, since every validated call just
+triggers `processChanges()`, and a no-op check (nothing new since the
+persisted page token) is harmless.
+
 ## Known open risk
 
-Drive push notifications may require the receiving domain to be verified
-for the associated Cloud project in some configurations. `script.google.com`
-deployments have worked for other teams without extra verification, but this
-hasn't been confirmed for this project's setup — verify end-to-end after
-step 4 above (create a test file in the watched folder and confirm
-`doPost` fires) before relying on this in production. If it doesn't work,
-fall back to a short-interval time-driven trigger calling
+Drive push notifications may still require the receiving domain to be
+verified for the associated Cloud project in some configurations.
+`script.google.com` deployments have worked for other teams without extra
+verification, but this hasn't been confirmed for this project's setup —
+verify end-to-end after deploying (create a test file in the watched folder
+and confirm `doPost` fires -- check via `Logger.log` output in the Apps
+Script editor's Executions panel) before relying on this in production. If
+it doesn't work, fall back to a short-interval time-driven trigger calling
 `ChangeProcessor.processChanges()` directly.

@@ -8,21 +8,48 @@
  * automatically for incoming POST requests to the deployed web app; it is
  * not called directly from elsewhere in this project.
  *
- * TODO: implement.
- * - Validate the X-Goog-Channel-ID header against the channel id persisted
- *   by startWatch(); ignore/reject requests that don't match (stale or
- *   spoofed channel).
- * - If X-Goog-Resource-State is 'sync' (the initial handshake Drive sends
- *   when a channel is created), just acknowledge -- there's no change to
- *   process yet.
- * - Otherwise, delegate to ChangeProcessor.processChanges().
- * - Design constraint to keep in mind when implementing: Drive expects a
- *   fast 2xx response from this endpoint. Any nontrivial work (unzipping,
- *   parsing) should be handed off rather than done inline here -- exact
- *   hand-off mechanism is Dispatcher.gs's open question.
+ * Known platform limitation this implementation works around: Drive push
+ * notifications carry their metadata (X-Goog-Resource-State,
+ * X-Goog-Channel-ID, X-Goog-Channel-Token, etc.) as HTTP headers, but Apps
+ * Script's doPost(e) event object has no way to read arbitrary request
+ * headers -- there is no e.headers. That rules out header-based channel
+ * validation and rules out distinguishing the initial 'sync' handshake
+ * from a real change notification. Two consequences, both handled below:
+ *   - Validation uses a shared-secret query parameter instead (readable
+ *     via e.parameter, see WatchChannel.gs::startWatch and
+ *     PROP_WEBHOOK_TOKEN in Config.gs).
+ *   - Every validated call (including the initial 'sync' ping) just
+ *     triggers processChanges(); relying on the persisted page token means
+ *     a no-op check (nothing new since last time) is harmless, so not
+ *     being able to tell 'sync' apart from a real change doesn't matter.
  *
  * @param {GoogleAppsScript.Events.DoPost} e
  */
 function doPost(e) {
-  throw new Error('TODO: not implemented -- see WebhookHandler.gs');
+  var props = PropertiesService.getScriptProperties();
+  var expectedToken = props.getProperty(PROP_WEBHOOK_TOKEN);
+  var providedToken = e && e.parameter ? e.parameter.token : null;
+
+  if (!expectedToken || providedToken !== expectedToken) {
+    Logger.log('Rejected webhook call: missing or invalid token.');
+    // Apps Script web apps always respond with HTTP 200 regardless of the
+    // content returned here -- there's no way to send a non-200 status
+    // from doPost. This body is informational only; skipping processChanges()
+    // below is the actual rejection.
+    return ContentService.createTextOutput('forbidden');
+  }
+
+  // processChanges() only lists changes and hands relevant ones off (see
+  // Dispatcher.gs) -- it doesn't itself unzip or parse anything, so it's
+  // light enough to run inline here despite Drive expecting a fast
+  // response. Swallow failures rather than let them propagate: an
+  // uncaught error would still return 200 from Apps Script's perspective,
+  // but logging it beats losing the failure silently.
+  try {
+    processChanges();
+  } catch (err) {
+    Logger.log('processChanges() failed: %s', err);
+  }
+
+  return ContentService.createTextOutput('ok');
 }

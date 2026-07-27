@@ -16,6 +16,14 @@ var PROP_RESOURCE_ID = 'DRIVE_WATCH_RESOURCE_ID';
 var PROP_PAGE_TOKEN = 'DRIVE_WATCH_PAGE_TOKEN';
 var PROP_CHANNEL_EXPIRATION = 'DRIVE_WATCH_CHANNEL_EXPIRATION';
 
+// Shared secret appended as a query param on the watch channel's address
+// (see WatchChannel.gs::startWatch). Apps Script's doPost(e) cannot read
+// the X-Goog-Channel-ID / X-Goog-Channel-Token headers Drive sends on push
+// notifications -- there is no e.headers -- so header-based validation
+// (as originally sketched here) isn't possible. A query-string token is
+// the workaround: query params ARE readable via e.parameter in doPost.
+var PROP_WEBHOOK_TOKEN = 'DRIVE_WATCH_WEBHOOK_TOKEN';
+
 /**
  * TODO: after deploying this project as a Web App (Deploy > New deployment
  * > Web app), paste the resulting /exec URL here. Drive push notifications
@@ -27,7 +35,7 @@ var PROP_CHANNEL_EXPIRATION = 'DRIVE_WATCH_CHANNEL_EXPIRATION';
  * extra verification, but this hasn't been confirmed for this project's
  * Cloud/Workspace setup -- verify this works end-to-end before relying on
  * it, and fall back to a short-interval time-driven trigger calling
- * listChanges() directly if push notifications turn out to be unreliable
- * here.
+ * ChangeProcessor.processChanges() directly if push notifications turn out
+ * to be unreliable here.
  */
 var WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbw-IqHHJrdFuvnVHyxHgn7lGp2U1q2_v5k5T1Ysbd0CcMG5kteQeL07uzSvzmWGLV9T/exec';

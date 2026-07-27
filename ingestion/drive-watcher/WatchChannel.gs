@@ -15,37 +15,94 @@
  * resulting channel state so ChangeProcessor and RenewalTrigger can use it
  * across separate executions.
  *
- * TODO: implement.
- * - Drive.Changes.getStartPageToken() to get a baseline pageToken.
- * - Drive.Changes.watch({ id: Utilities.getUuid(), type: 'web_hook',
- *   address: WEBHOOK_URL }, startPageToken) to register the channel.
- * - Persist channelId, resourceId, pageToken, and expiration into Script
- *   Properties via the PROP_* keys defined in Config.gs.
+ * Run this manually from the Apps Script editor as part of one-time setup
+ * (see ingestion/drive-watcher/README.md), and again from
+ * RenewalTrigger.renewWatchIfNeeded() before the channel expires.
  */
 function startWatch() {
-  throw new Error('TODO: not implemented -- see WatchChannel.gs');
+  var props = PropertiesService.getScriptProperties();
+
+  // Reuse an existing webhook token across restarts so a renewal doesn't
+  // silently invalidate calls already in flight. See the PROP_WEBHOOK_TOKEN
+  // comment in Config.gs for why this exists instead of header validation.
+  var webhookToken = props.getProperty(PROP_WEBHOOK_TOKEN);
+  if (!webhookToken) {
+    webhookToken = Utilities.getUuid();
+    props.setProperty(PROP_WEBHOOK_TOKEN, webhookToken);
+  }
+  var separator = WEBHOOK_URL.indexOf('?') === -1 ? '?' : '&';
+  var address = WEBHOOK_URL + separator + 'token=' + encodeURIComponent(webhookToken);
+
+  var startPageToken = Drive.Changes.getStartPageToken().startPageToken;
+
+  var channel = Drive.Changes.watch(
+    {
+      id: Utilities.getUuid(),
+      type: 'web_hook',
+      address: address
+    },
+    startPageToken
+  );
+
+  // channel.expiration is whatever Google actually assigned (a Unix ms
+  // timestamp, as a string) -- we don't hardcode a ceiling and just trust
+  // this value, which sidesteps needing to confirm Drive's current default
+  // expiration window ahead of time.
+  props.setProperty(PROP_CHANNEL_ID, channel.id);
+  props.setProperty(PROP_RESOURCE_ID, channel.resourceId);
+  props.setProperty(PROP_PAGE_TOKEN, startPageToken);
+  props.setProperty(PROP_CHANNEL_EXPIRATION, channel.expiration || '');
+
+  Logger.log(
+    'Started Drive watch channel %s (resourceId=%s), expires %s',
+    channel.id, channel.resourceId, channel.expiration
+  );
+
+  return channel;
 }
 
 /**
- * Stops the currently active watch channel and clears its persisted state.
- *
- * TODO: implement.
- * - Drive.Channels.stop({ id, resourceId }) using the stored PROP_* values.
- * - Clear the PROP_* Script Properties afterward.
+ * Stops the currently active watch channel and clears its persisted state
+ * (except the webhook token, which is reused across restarts).
  */
 function stopWatch() {
-  throw new Error('TODO: not implemented -- see WatchChannel.gs');
+  var props = PropertiesService.getScriptProperties();
+  var channelId = props.getProperty(PROP_CHANNEL_ID);
+  var resourceId = props.getProperty(PROP_RESOURCE_ID);
+
+  if (!channelId || !resourceId) {
+    Logger.log('No active watch channel found in Script Properties; nothing to stop.');
+    return;
+  }
+
+  Drive.Channels.stop({ id: channelId, resourceId: resourceId });
+
+  props.deleteProperty(PROP_CHANNEL_ID);
+  props.deleteProperty(PROP_RESOURCE_ID);
+  props.deleteProperty(PROP_PAGE_TOKEN);
+  props.deleteProperty(PROP_CHANNEL_EXPIRATION);
+
+  Logger.log('Stopped Drive watch channel %s', channelId);
 }
 
 /**
  * Returns whether the persisted watch channel is still within its
- * expiration window.
- *
- * TODO: implement.
- * - Compare PROP_CHANNEL_EXPIRATION against Date.now().
- * - Confirm the actual Drive channel expiration ceiling against current API
- *   docs before RenewalTrigger.gs hardcodes a renewal cadence around this.
+ * expiration window. Used by RenewalTrigger.renewWatchIfNeeded() to decide
+ * whether a renewal is due.
  */
 function isWatchActive() {
-  throw new Error('TODO: not implemented -- see WatchChannel.gs');
+  var props = PropertiesService.getScriptProperties();
+  var channelId = props.getProperty(PROP_CHANNEL_ID);
+  var expiration = props.getProperty(PROP_CHANNEL_EXPIRATION);
+
+  if (!channelId || !expiration) {
+    return false;
+  }
+
+  var expirationMs = Number(expiration);
+  if (!expirationMs) {
+    return false;
+  }
+
+  return Date.now() < expirationMs;
 }
