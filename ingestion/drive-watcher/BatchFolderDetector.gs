@@ -11,41 +11,66 @@
  *
  * Current scope (see CONTRIBUTING.md): post_<job_name>.zip is the only file
  * type expected to land inside a batch folder. Nothing else is currently
- * supported or expected -- isNewPostZipFile should validate the filename
- * against that convention (post_zip_file_format_spec.md §0), and anything
- * in the folder that doesn't match is anomalous for now (log/flag it),
- * not a different file type to route elsewhere.
+ * supported or expected -- isNewPostZipFile validates the filename against
+ * that convention (post_zip_file_format_spec.md §0); anything in the
+ * folder that doesn't match returns false here and is simply not routed
+ * anywhere by ChangeProcessor, rather than being treated as a different
+ * file type to route elsewhere.
+ *
+ * All of this assumes the fixed 2-level hierarchy documented in the
+ * Proposal Outline §4.1 (root -> batch folder -> file) -- these functions
+ * don't walk arbitrarily deep.
  */
 
+var FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
+var POST_ZIP_NAME_PATTERN = /^post_.+\.zip$/;
+
 /**
- * TODO: implement.
- * - Walk the file's parents chain (file.parents from the Drive API) and
- *   check whether WATCHED_FOLDER_ID appears at the expected depth (direct
- *   parent, for case 2 above) or is itself the parent (case 1).
+ * True if `fileId` is either a direct child of WATCHED_FOLDER_ID, or a
+ * grandchild of it (i.e. its parent's parent is WATCHED_FOLDER_ID).
  * @param {string} fileId
  */
 function isWithinWatchedFolder(fileId) {
-  throw new Error('TODO: not implemented -- see BatchFolderDetector.gs');
+  var file = Drive.Files.get(fileId, { fields: 'id, parents' });
+  var parents = file.parents || [];
+  if (parents.indexOf(WATCHED_FOLDER_ID) !== -1) {
+    return true;
+  }
+  return parents.some(function (parentId) {
+    var parent = Drive.Files.get(parentId, { fields: 'id, parents' });
+    return (parent.parents || []).indexOf(WATCHED_FOLDER_ID) !== -1;
+  });
 }
 
 /**
- * TODO: implement. True when `file` is a new folder created directly under
- * WATCHED_FOLDER_ID (case 1 above).
- * @param {Object} file
+ * True when `file` is a folder created directly under WATCHED_FOLDER_ID
+ * (case 1 above) -- a new batch folder.
+ * @param {Object} file Drive file resource with at least mimeType, parents.
  */
 function isNewBatchFolder(file) {
-  throw new Error('TODO: not implemented -- see BatchFolderDetector.gs');
+  if (!file || file.mimeType !== FOLDER_MIME_TYPE) {
+    return false;
+  }
+  return (file.parents || []).indexOf(WATCHED_FOLDER_ID) !== -1;
 }
 
 /**
- * TODO: implement. True when `file` is a new post.zip created inside an
- * existing batch folder (case 2 above) -- i.e. its name matches
- * `post_<job_name>.zip` per post_zip_file_format_spec.md §0. Per current
- * scope, this is the only file type ever expected here; a file inside a
- * batch folder that doesn't match should return false and get logged
- * upstream as unexpected, not silently accepted.
- * @param {Object} file
+ * True when `file` is a post.zip created inside an existing batch folder
+ * (case 2 above) -- its name matches `post_<job_name>.zip`
+ * (post_zip_file_format_spec.md §0) and its parent folder is itself a
+ * direct child of WATCHED_FOLDER_ID.
+ * @param {Object} file Drive file resource with at least name, mimeType,
+ *     parents.
  */
 function isNewPostZipFile(file) {
-  throw new Error('TODO: not implemented -- see BatchFolderDetector.gs');
+  if (!file || file.mimeType === FOLDER_MIME_TYPE) {
+    return false;
+  }
+  if (!POST_ZIP_NAME_PATTERN.test(file.name || '')) {
+    return false;
+  }
+  var parents = file.parents || [];
+  return parents.some(function (parentFolderId) {
+    return isWithinWatchedFolder(parentFolderId);
+  });
 }

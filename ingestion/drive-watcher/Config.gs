@@ -24,6 +24,12 @@ var PROP_CHANNEL_EXPIRATION = 'DRIVE_WATCH_CHANNEL_EXPIRATION';
 // the workaround: query params ARE readable via e.parameter in doPost.
 var PROP_WEBHOOK_TOKEN = 'DRIVE_WATCH_WEBHOOK_TOKEN';
 
+// Script Properties key for the processing-queue spreadsheet (see
+// Dispatcher.gs) that detected post.zip files get appended to as rows for
+// a separate Python job to pick up. Self-provisioned on first use -- see
+// Dispatcher.gs::getOrCreateQueueSheet -- rather than a manual TODO here.
+var PROP_QUEUE_SPREADSHEET_ID = 'DRIVE_WATCH_QUEUE_SPREADSHEET_ID';
+
 /**
  * TODO: after deploying this project as a Web App (Deploy > New deployment
  * > Web app), paste the resulting /exec URL here. Drive push notifications

@@ -4,31 +4,56 @@ Google Apps Script project that watches the shared Drive folder batch
 outputs get dropped into, and fires (push-based, not polling) when a new
 batch folder or `post.zip` shows up.
 
-**Status:** `WatchChannel.gs`, `WebhookHandler.gs`, and `RenewalTrigger.gs`
-are implemented and have been run successfully (watch channel registered,
-daily renewal trigger installed). `ChangeProcessor.gs`,
-`BatchFolderDetector.gs`, and `Dispatcher.gs` are still stubs -- see
-file-level TODOs. Until those are implemented, incoming notifications hit
-`doPost`, which calls `processChanges()` and gets an error back (caught and
-logged, not surfaced) since that's one of the still-stubbed files.
+**Status:** all six `.gs` files are implemented. `WatchChannel.gs`,
+`WebhookHandler.gs`, and `RenewalTrigger.gs` have been run successfully
+(watch channel registered, daily renewal trigger installed).
+`ChangeProcessor.gs`, `BatchFolderDetector.gs`, and `Dispatcher.gs` are
+implemented but not yet exercised end-to-end against a real post.zip drop
+-- see "Testing the detection chain" below. The Python side that would
+consume the processing queue `Dispatcher.gs` writes to doesn't exist yet.
 
 ## Files
 
 - `appsscript.json` — project manifest (Drive v3 advanced service, web app
   config).
 - `Config.gs` — `WATCHED_FOLDER_ID`, `WEBHOOK_URL`, and the Script Properties
-  keys used to persist watch-channel state across executions.
+  keys used to persist watch-channel and queue state across executions.
 - `WatchChannel.gs` — start/stop/check the Drive push-notification channel.
-  **Implemented.**
+  **Implemented, run.**
 - `WebhookHandler.gs` — `doPost`, the entry point Drive calls. **Implemented**
   (see "Header limitation" below for a real constraint this works around).
-- `ChangeProcessor.gs` — pulls the actual change list once notified. Stub.
+- `ChangeProcessor.gs` — pulls the actual change list once notified, routes
+  each change to `BatchFolderDetector` and relevant ones on to `Dispatcher`.
+  **Implemented, not yet exercised end-to-end.**
 - `BatchFolderDetector.gs` — filters the account-wide change feed down to
-  events inside `WATCHED_FOLDER_ID`. Stub.
-- `Dispatcher.gs` — hands a detected file off to the next stage (mechanism
-  not yet decided — see TODO in the file). Stub.
+  new batch folders / new post.zip files inside `WATCHED_FOLDER_ID`.
+  **Implemented.**
+- `Dispatcher.gs` — hands a detected post.zip off via a Google Sheet
+  processing queue (self-provisioned on first use). **Implemented** -- see
+  "Processing queue" below.
 - `RenewalTrigger.gs` — keeps the watch channel alive (channels expire; this
-  is subscription bookkeeping, not file polling). **Implemented.**
+  is subscription bookkeeping, not file polling). **Implemented, run.**
+
+## Processing queue
+
+`Dispatcher.handOffNewFile` appends a row (timestamp, file id/name, batch
+folder id/name, `status: pending`) to a "Queue" sheet in a spreadsheet it
+creates on first use (title `BFR Drive Watcher - Processing Queue`; its ID
+is persisted in Script Properties as `DRIVE_WATCH_QUEUE_SPREADSHEET_ID` so
+later calls reuse it). Nothing reads this queue yet -- the Python job that
+would poll it and do the actual unzip/parse/`data/results.csv` work hasn't
+been built. Run `ensureQueueSheetExists()` once from the editor (same
+reason as `startWatch`/`installRenewalTrigger` -- see "Running functions"
+below) to grant the Sheets scope this needs and confirm the spreadsheet
+gets created, without waiting for a real post.zip drop to trigger it first.
+
+## Testing the detection chain
+
+Not yet verified against a real Drive event. To test: drop a file named
+like `post_TEST_20260101.zip` into an existing batch folder under
+`WATCHED_FOLDER_ID` (or create a new batch folder), then check the
+Executions log for `doPost` firing and `processChanges()`/`handOffNewFile`
+log lines, and check the queue spreadsheet for a new row.
 
 ## Why not a simple time-driven trigger?
 
