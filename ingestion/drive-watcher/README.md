@@ -4,9 +4,13 @@ Google Apps Script project that watches the shared Drive folder batch
 outputs get dropped into, and fires (push-based, not polling) when a new
 batch folder or `post.zip` shows up.
 
-**Status:** `WatchChannel.gs` and `WebhookHandler.gs` are implemented.
-`ChangeProcessor.gs`, `BatchFolderDetector.gs`, `Dispatcher.gs`, and
-`RenewalTrigger.gs` are still stubs -- see file-level TODOs.
+**Status:** `WatchChannel.gs`, `WebhookHandler.gs`, and `RenewalTrigger.gs`
+are implemented and have been run successfully (watch channel registered,
+daily renewal trigger installed). `ChangeProcessor.gs`,
+`BatchFolderDetector.gs`, and `Dispatcher.gs` are still stubs -- see
+file-level TODOs. Until those are implemented, incoming notifications hit
+`doPost`, which calls `processChanges()` and gets an error back (caught and
+logged, not surfaced) since that's one of the still-stubbed files.
 
 ## Files
 
@@ -24,7 +28,7 @@ batch folder or `post.zip` shows up.
 - `Dispatcher.gs` — hands a detected file off to the next stage (mechanism
   not yet decided — see TODO in the file). Stub.
 - `RenewalTrigger.gs` — keeps the watch channel alive (channels expire; this
-  is subscription bookkeeping, not file polling). Stub.
+  is subscription bookkeeping, not file polling). **Implemented.**
 
 ## Why not a simple time-driven trigger?
 
