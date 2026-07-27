@@ -1,16 +1,19 @@
 # drive-watcher
 
 Google Apps Script project that watches the shared Drive folder batch
-outputs get dropped into, and fires (push-based, not polling) when a new
-batch folder, post.zip, or unzipped post folder shows up.
+outputs get dropped into, and fires when a new batch folder, post.zip, or
+unzipped post folder shows up. **Currently polling-based, not push-based**
+-- see "Push notifications never reliably worked" below; that was the
+original design intent and the infrastructure for it is still in place,
+just not what detection actually depends on right now.
 
-**Status:** all six `.gs` files are implemented and running. Watch channel
-registered, daily renewal trigger installed, and the full detection chain
-(`doPost` → `processChanges` → `BatchFolderDetector` → `Dispatcher` → queue
-row) has been confirmed working end-to-end against a real `post.zip` drop.
+**Status:** all `.gs` files are implemented and running. The full detection
+chain (`processChanges` → `BatchFolderDetector` → `Dispatcher` → queue row)
+has been confirmed working end-to-end against real `post.zip` drops.
 `ingestion/queue_consumer/` (Python) now reads that queue -- see its own
 docstring -- though it's still blocked downstream on `ingestion/parsers/`'s
-stubs.
+stubs. Detection itself runs on a 5-minute polling trigger
+(`installPollingTrigger()`), not the push-notification path.
 
 ## Files
 
@@ -89,20 +92,21 @@ To test: drop a file named `post_<anything>.zip`, or a folder named
 `post_<anything>` (see "Post job shapes" above), either inside a batch
 folder under `WATCHED_FOLDER_ID`, or directly in `WATCHED_FOLDER_ID` itself
 (no batch folder required -- see BatchFolderDetector.gs's cases 3/4), then
-check the Executions log for `doPost` firing and
-`processChanges()`/`handOffNewFile` log lines, and check the queue
-spreadsheet for a new row.
+wait up to 5 minutes for the polling trigger and check the Executions log
+for `processChanges()`/`handOffNewFile` log lines, and check the queue
+spreadsheet for a new row. (If push notifications are also running --
+optional, see above -- you might additionally see a `doPost` entry, but
+detection doesn't depend on it.)
 
 If a file was uploaded *before* a code change that affects whether it
 matches, pushing the fix alone won't reprocess it -- `Changes.list` only
 returns changes since the last recorded page token, and that file's change
 event was very likely already consumed (and the page token advanced past
-it) the first time `doPost` ran for it, whether or not it matched. To
+it) the first time `processChanges()` ran, whether or not it matched. To
 retest an already-uploaded file after a detection-logic change, either
 re-upload it (or make any edit that generates a fresh Drive change event),
-or run `processChanges()` manually from the editor -- if the original
-change was never actually delivered (e.g. the push notification didn't
-arrive at all), that manual call will still pick it up.
+or run `processChanges()` manually from the editor to force an immediate
+check instead of waiting for the next 5-minute tick.
 
 ## Deployments are frozen snapshots -- `clasp push` alone doesn't update them
 
@@ -158,6 +162,30 @@ channels keep coming back at ~1h.
 update itself just because the code changed) and `startWatch()` (to
 register a channel under the new expiration-requesting logic).
 
+## Push notifications never reliably worked -- switched to polling (2026-07-27)
+
+Even after fixing both confirmed bugs above (stale deployment, then channel
+expiration/renewal cadence), `doPost` still didn't fire automatically on a
+clean end-to-end retest. At that point, chasing this further stopped being
+worth it relative to just using the fallback this project always planned
+for (see the old `WEBHOOK_URL` comment history in `Config.gs`, and "Why not
+a simple time-driven trigger?" below for why push was tried first).
+
+**What's live now:** `ChangeProcessor.installPollingTrigger()` installs a
+5-minute time-driven trigger calling `processChanges()` directly --
+detection no longer depends on `doPost` firing at all. The push
+infrastructure (`WatchChannel.gs`, `WebhookHandler.gs`,
+`RenewalTrigger.gs`) is left running, not removed -- harmless, and if it
+ever starts working the polling trigger just becomes redundant rather than
+something that needs to be un-done.
+
+**Not conclusively root-caused.** The original suspicion from before any
+of this was built -- Drive push notifications sometimes require the
+receiving domain to be verified for the associated Cloud project -- was
+never ruled in or out with the same confidence as the deployment/expiration
+bugs. Worth revisiting if someone wants push's lower latency later, but
+polling is what this pipeline actually runs on for now.
+
 ## Why not a simple time-driven trigger?
 
 Apps Script's easiest option for "run periodically" is a time-driven
@@ -165,7 +193,9 @@ trigger, but that's polling. Drive's `Changes.watch` gives a real push
 notification (a webhook POST) instead, at the cost of more setup: it's
 account-wide rather than folder-scoped, so filtering has to happen in code,
 and the subscription needs periodic renewal. See the module docstring in
-`WatchChannel.gs` for the full reasoning.
+`WatchChannel.gs` for the full reasoning. **This was the reasoning for
+trying push first, not a claim that polling doesn't work** -- see directly
+above for why this project ended up on a polling trigger anyway.
 
 ## One-time manual deploy steps
 
@@ -175,12 +205,14 @@ and the subscription needs periodic renewal. See the module docstring in
 2. **Deploy → New deployment → Web app.** Execute as: Me. Who has access:
    Anyone.
 3. Copy the resulting `/exec` URL into `WEBHOOK_URL` in `Config.gs`.
-4. Run `startWatch()` once **from the Apps Script editor UI** (select it in
-   the function dropdown, click Run) to register the push-notification
-   channel -- see "Running functions" below for why this has to be the
-   editor and not `clasp run`.
-5. Run `installRenewalTrigger()` once, same way, to install the daily
-   channel-renewal check.
+4. Run `installPollingTrigger()` once **from the Apps Script editor UI**
+   (select it in the function dropdown, click Run) -- this is what
+   detection actually runs on right now (see "Push notifications never
+   reliably worked" above); see "Running functions" below for why this has
+   to be the editor and not `clasp run`.
+5. Optional, best-effort (push isn't relied on, but doesn't hurt to have
+   running too): `startWatch()` to register a push-notification channel,
+   then `installRenewalTrigger()` to keep it alive.
 
 ## Running functions: editor UI, not `clasp run`
 

@@ -36,17 +36,31 @@ var PROP_QUEUE_SPREADSHEET_ID = 'DRIVE_WATCH_QUEUE_SPREADSHEET_ID';
 var GENERATED_SHEETS_FOLDER_ID = '1QCln4vmn7F-QdfQjA5dXi092Vydts2z_';
 
 /**
- * TODO: after deploying this project as a Web App (Deploy > New deployment
- * > Web app), paste the resulting /exec URL here. Drive push notifications
- * are POSTed to this address.
+ * The deployed Web App's /exec URL. Drive push notifications are POSTed to
+ * this address (with a ?token=... query param appended by
+ * WatchChannel.gs::startWatch -- see PROP_WEBHOOK_TOKEN above).
  *
- * Note: Drive's push notification API requires the receiving domain to be
- * verified for the associated Cloud project in some configurations. In
- * practice script.google.com deployments have worked for teams without
- * extra verification, but this hasn't been confirmed for this project's
- * Cloud/Workspace setup -- verify this works end-to-end before relying on
- * it, and fall back to a short-interval time-driven trigger calling
- * ChangeProcessor.processChanges() directly if push notifications turn out
- * to be unreliable here.
+ * IMPORTANT: this is a specific deployment, not HEAD -- `clasp push` alone
+ * does NOT update what's served here. After changing doPost, processChanges,
+ * or anything they call, run `clasp update-deployment <this deployment's
+ * id>` too, or the live endpoint keeps serving old code silently (Apps
+ * Script web apps always return HTTP 200 regardless of what the code
+ * does, so a stale deployment fails invisibly). See
+ * ingestion/drive-watcher/README.md's "Deployments are frozen snapshots"
+ * section -- this exact mistake cost real debugging time (2026-07-27).
+ *
+ * Status (2026-07-26): push notifications never reliably reached doPost
+ * for this project's setup, even after fixing the stale-deployment bug
+ * above and a separate channel-expiration/renewal-cadence bug (see
+ * README's "Watch channels lasted ~1 hour" section). Root cause not fully
+ * confirmed -- domain verification (the original concern this comment used
+ * to flag) remains a plausible explanation, but wasn't isolated as
+ * conclusively as the other two bugs were. Falling back to the
+ * originally-planned polling trigger: see
+ * ChangeProcessor.gs::installPollingTrigger(), which calls
+ * processChanges() directly every 5 minutes. Push infrastructure
+ * (WatchChannel.gs, WebhookHandler.gs, RenewalTrigger.gs) is left in
+ * place and still running, not removed -- if it starts working, detection
+ * just gets faster; the polling trigger keeps things working either way.
  */
 var WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbw-IqHHJrdFuvnVHyxHgn7lGp2U1q2_v5k5T1Ysbd0CcMG5kteQeL07uzSvzmWGLV9T/exec';

@@ -7,6 +7,38 @@ var CHANGES_LIST_FIELDS =
   'changes(fileId,removed,file(id,name,mimeType,parents)),newStartPageToken,nextPageToken';
 
 /**
+ * One-time manual setup (editor UI, not clasp run -- see README's "Running
+ * functions" note): installs a polling fallback trigger that calls
+ * processChanges() directly every 5 minutes, regardless of whether Drive's
+ * push notifications are reaching doPost.
+ *
+ * Not the originally intended design (see WatchChannel.gs's module
+ * docstring for why push was preferred) -- but push has proven unreliable
+ * for this project's setup even after fixing two confirmed real bugs (a
+ * stale deployment, and a too-infrequent channel-renewal cadence). This was
+ * always the documented fallback (see Config.gs's WEBHOOK_URL comment),
+ * now actually installed. The push-notification infrastructure
+ * (WatchChannel.gs, WebhookHandler.gs, RenewalTrigger.gs) is left running,
+ * not removed -- if it ever starts working reliably, detection just gets
+ * faster; this polling trigger keeps things working either way. Safe to
+ * re-run: clears any existing trigger for processChanges first.
+ */
+function installPollingTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function (trigger) {
+    if (trigger.getHandlerFunction() === 'processChanges') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  ScriptApp.newTrigger('processChanges')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  Logger.log('Installed 5-minute polling trigger for processChanges().');
+}
+
+/**
  * Fetches changes since the last recorded page token, routes each relevant
  * one (new batch folder / new post.zip -- see BatchFolderDetector.gs) to
  * Dispatcher.handOffNewFile, and advances PROP_PAGE_TOKEN so the next call
