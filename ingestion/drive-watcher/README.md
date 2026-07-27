@@ -49,11 +49,23 @@ gets created, without waiting for a real post.zip drop to trigger it first.
 
 ## Testing the detection chain
 
-Not yet verified against a real Drive event. To test: drop a file named
-like `post_TEST_20260101.zip` into an existing batch folder under
-`WATCHED_FOLDER_ID` (or create a new batch folder), then check the
-Executions log for `doPost` firing and `processChanges()`/`handOffNewFile`
-log lines, and check the queue spreadsheet for a new row.
+To test: drop a file named `post_<anything>.zip` either inside a batch
+folder under `WATCHED_FOLDER_ID`, or directly in `WATCHED_FOLDER_ID` itself
+(no batch folder required -- see BatchFolderDetector.gs's case 3), then
+check the Executions log for `doPost` firing and
+`processChanges()`/`handOffNewFile` log lines, and check the queue
+spreadsheet for a new row.
+
+If a file was uploaded *before* a code change that affects whether it
+matches, pushing the fix alone won't reprocess it -- `Changes.list` only
+returns changes since the last recorded page token, and that file's change
+event was very likely already consumed (and the page token advanced past
+it) the first time `doPost` ran for it, whether or not it matched. To
+retest an already-uploaded file after a detection-logic change, either
+re-upload it (or make any edit that generates a fresh Drive change event),
+or run `processChanges()` manually from the editor -- if the original
+change was never actually delivered (e.g. the push notification didn't
+arrive at all), that manual call will still pick it up.
 
 ## Why not a simple time-driven trigger?
 

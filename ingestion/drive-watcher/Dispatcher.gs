@@ -14,7 +14,11 @@ var QUEUE_HEADERS = ['detected_at', 'file_id', 'file_name', 'batch_folder_id', '
 
 /**
  * Appends a row to the processing queue for `file` (a post.zip Drive file
- * resource -- see BatchFolderDetector.isNewPostZipFile).
+ * resource -- see BatchFolderDetector.isNewPostZipFile). `file`'s parent
+ * may be a real batch folder, or WATCHED_FOLDER_ID itself if the post.zip
+ * was dropped with no batch folder (BatchFolderDetector's case 3) -- in
+ * that case batch_folder_name below just ends up as the watched root's own
+ * name, which downstream consumers should treat as "no batch folder."
  * @param {Object} file
  */
 function handOffNewFile(file) {

@@ -1,25 +1,34 @@
 /**
  * Filters the account-wide Drive change feed down to events relevant to
- * WATCHED_FOLDER_ID, and distinguishes the two event shapes we actually
- * care about.
+ * WATCHED_FOLDER_ID, and distinguishes the event shapes we actually care
+ * about.
  *
  * These are genuinely different cases and should not be collapsed into one:
  *   1. A new batch folder (e.g. RW_v3_VEL_20260709_YM/) created directly
  *      under WATCHED_FOLDER_ID.
  *   2. A new post.zip file added inside an *existing* batch folder (a
- *      grandchild of WATCHED_FOLDER_ID).
+ *      grandchild of WATCHED_FOLDER_ID) -- the organized case, per the
+ *      Proposal Outline §4.1 folder-per-batch convention.
+ *   3. A new post.zip file added directly under WATCHED_FOLDER_ID, with no
+ *      batch folder at all. Not the documented convention, but supported
+ *      deliberately -- in practice not everyone will always organize
+ *      uploads into batch folders, and a post.zip dropped loose shouldn't
+ *      silently go unprocessed. When this happens, `source_drive_folder`
+ *      downstream just ends up pointing at the watched root itself rather
+ *      than a meaningful batch folder -- that's an accepted tradeoff of
+ *      allowing this case, not a bug.
  *
  * Current scope (see CONTRIBUTING.md): post_<job_name>.zip is the only file
- * type expected to land inside a batch folder. Nothing else is currently
- * supported or expected -- isNewPostZipFile validates the filename against
- * that convention (post_zip_file_format_spec.md §0); anything in the
- * folder that doesn't match returns false here and is simply not routed
- * anywhere by ChangeProcessor, rather than being treated as a different
- * file type to route elsewhere.
+ * type expected to land here (in a batch folder or directly under the
+ * root). Nothing else is currently supported or expected -- isNewPostZipFile
+ * validates the filename against that convention
+ * (post_zip_file_format_spec.md §0); anything that doesn't match returns
+ * false here and is simply not routed anywhere by ChangeProcessor, rather
+ * than being treated as a different file type to route elsewhere.
  *
- * All of this assumes the fixed 2-level hierarchy documented in the
- * Proposal Outline §4.1 (root -> batch folder -> file) -- these functions
- * don't walk arbitrarily deep.
+ * Folder nesting is assumed to be at most the 2-level hierarchy documented
+ * in the Proposal Outline §4.1 (root -> batch folder -> file) -- these
+ * functions don't walk arbitrarily deep.
  */
 
 var FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
@@ -55,10 +64,11 @@ function isNewBatchFolder(file) {
 }
 
 /**
- * True when `file` is a post.zip created inside an existing batch folder
- * (case 2 above) -- its name matches `post_<job_name>.zip`
- * (post_zip_file_format_spec.md §0) and its parent folder is itself a
- * direct child of WATCHED_FOLDER_ID.
+ * True when `file` is a post.zip either inside an existing batch folder
+ * (case 2 above) or directly under WATCHED_FOLDER_ID with no batch folder
+ * (case 3 above) -- its name matches `post_<job_name>.zip`
+ * (post_zip_file_format_spec.md §0) and its parent is either
+ * WATCHED_FOLDER_ID itself or a folder that's a direct child of it.
  * @param {Object} file Drive file resource with at least name, mimeType,
  *     parents.
  */
@@ -71,6 +81,6 @@ function isNewPostZipFile(file) {
   }
   var parents = file.parents || [];
   return parents.some(function (parentFolderId) {
-    return isWithinWatchedFolder(parentFolderId);
+    return parentFolderId === WATCHED_FOLDER_ID || isWithinWatchedFolder(parentFolderId);
   });
 }
