@@ -104,6 +104,33 @@ or run `processChanges()` manually from the editor -- if the original
 change was never actually delivered (e.g. the push notification didn't
 arrive at all), that manual call will still pick it up.
 
+## Deployments are frozen snapshots -- `clasp push` alone doesn't update them
+
+Found the hard way (2026-07-27): `WEBHOOK_URL` (Config.gs) points at a
+specific **deployment**, not at HEAD. `clasp push` only updates HEAD/dev --
+an existing deployment keeps serving whatever code was live when it was
+created (or last explicitly redeployed) until you run
+`clasp update-deployment <deploymentId>` (aka `clasp redeploy`).
+
+In this project's case, `WEBHOOK_URL` had been pointing at deployment `@1`
+("Drive watcher webhook v1") since the very first manual deploy step --
+made *before* `WatchChannel.gs`/`WebhookHandler.gs` were implemented, back
+when `doPost` was still `throw new Error('TODO: not implemented')`. Every
+push notification Drive sent for the rest of this build likely landed on
+that frozen stub, which still returns HTTP 200 (Apps Script always does,
+regardless of what the code does internally) -- so failures were invisible
+from Drive's side, and the only symptom was "push notifications never seem
+to fire," which really meant "they fire, but hit dead code." Manually
+running `processChanges()` was masking this the whole time.
+
+**Fixed** by running `clasp update-deployment <the deployment id
+WEBHOOK_URL uses> --description "..."` to push current code onto that
+existing deployment (same URL, new version -- no need to change
+`WEBHOOK_URL` or re-register the channel). **Takeaway: after any change to
+`doPost`, `processChanges`, or anything they call, redeploy** --
+`clasp push` to HEAD is not enough on its own for anything reachable via
+the live webhook.
+
 ## Why not a simple time-driven trigger?
 
 Apps Script's easiest option for "run periodically" is a time-driven
