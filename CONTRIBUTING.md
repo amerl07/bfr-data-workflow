@@ -118,6 +118,17 @@ to downloading copies to a dedicated non-repo destination (e.g. a Drive
 This is explicitly a decision to revisit, not a closed one -- update this
 section if/when that happens.
 
+**Gap discovered while wiring up `ingestion/queue_consumer/`:** this
+decision assumed each scene image is individually addressable on Drive (a
+file ID/link per image). In practice, scene images only exist as entries
+*inside* the `post.zip` archive -- they're never uploaded to Drive as
+individual files, so there's no per-image Drive link to actually store.
+`format_scene_image_refs` in `ingestion/queue_consumer/main.py` is stubbed
+out pending a decision here (re-upload each image individually / link to
+the post.zip as a whole instead of per-image / adopt the "download a copy"
+fallback above) -- added to the open questions list below rather than
+picked silently.
+
 ## 5. `data/results.csv` schema
 
 One row per `post.zip` processed. See
@@ -134,7 +145,7 @@ One row per `post.zip` processed. See
 | `owner_initials` | From filename |
 | `CL`, `CD`, `CoP` | Parsed from `force_reports.txt` (§3.5) |
 | `swept_variable`, `swept_range` | From `force_reports.txt`, **if present** -- unconfirmed, see open questions |
-| `scene_image_refs` | Drive file ID/link per image (§4) |
+| `scene_image_refs` | Drive file ID/link per image (§4) -- format undecided, see the gap noted in §4 |
 | `source_drive_folder` | Path/link to the originating batch folder |
 
 ## 6. Open questions (consolidated)
@@ -168,6 +179,12 @@ Pulled from `docs/` into one place so they're easy to track:
       (Proposal Outline §6)
 - [ ] Retention policy for `.sim` files (who hosts them, for how long).
       (Proposal Outline §6)
+- [ ] `scene_image_refs` format: the "link only" decision (§4) assumed
+      per-image Drive links, but images only exist as `post.zip` zip
+      entries, never uploaded individually -- decide whether to re-upload
+      each image, link to the post.zip as a whole, or actually download
+      copies (the fallback already described in §4). Discovered in
+      `ingestion/queue_consumer/main.py::format_scene_image_refs`.
 
 ## 7. Owner-initials registry
 

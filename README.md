@@ -5,10 +5,13 @@ watches a shared Google Drive folder for Sabalcore `post.zip` outputs,
 parses them into structured rows, and keeps a central, queryable record of
 sim results instead of scattered per-person spreadsheets.
 
-**Status:** early scaffolding. Directory structure, stub functions, and
-docs are in place; no real parsing logic exists yet (no sample
-`force_reports.txt` has been available to build against). See file-level
-TODOs throughout.
+**Status:** the drive-watcher (Apps Script) is fully implemented and running
+-- it detects a new `post.zip` and queues it in a Google Sheet. The queue
+consumer (Python) reads that queue, downloads/unzips each file, and is
+wired up to call the parsers -- but the parsers themselves
+(`ingestion/parsers/`) are still stubs (no sample `force_reports.txt` has
+been available to build against), so rows aren't reaching
+`data/results.csv` yet. See file-level TODOs throughout.
 
 ## Repo layout
 
@@ -17,7 +20,12 @@ docs/                    Design docs and open questions -- read these first.
 ingestion/
   drive-watcher/          Google Apps Script: watches the Drive batch folder,
                            push-notification-based (not polling), fires on
-                           new batch folders / post.zip uploads.
+                           new batch folders / post.zip uploads, queues
+                           detections in a Google Sheet. Implemented, running.
+  queue_consumer/          Python: reads the queue sheet, downloads/unzips
+                           each post.zip, calls the parsers below, writes
+                           data/results.csv rows. Plumbing implemented;
+                           blocked downstream on the parser stubs.
   parsers/                 Python stubs: folder-name parser, Sabalcore
                            .sim/post.zip filename parser, post.zip file
                            classifier, force_reports.txt parser.

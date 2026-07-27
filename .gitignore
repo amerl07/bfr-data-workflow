@@ -239,6 +239,7 @@ credentials.json
 *.key
 service-account*.json
 .clasp.json
+token.json
 
 # OS cruft
 .DS_Store
