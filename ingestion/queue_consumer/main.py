@@ -275,6 +275,18 @@ def unzip(zip_path, tmp_dir):
     extract_dir.mkdir()
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(extract_dir)
+
+    entries = list(extract_dir.iterdir())
+    if len(entries) == 1 and entries[0].is_dir():
+        # Confirmed against a real upload: some post.zip exports wrap
+        # everything in a single top-level folder (e.g.
+        # "post_<job_name>/CP_Top.png" instead of "CP_Top.png" at the zip
+        # root) -- the flat-root assumption from the original sample
+        # (docs/PostDotZip_FileNames.txt) doesn't universally hold. Without
+        # this, the wrapper folder is the only thing seen at this level,
+        # gets skipped (not a file) by upload_extracted_images, and every
+        # downstream field silently ends up empty instead of erroring.
+        return entries[0]
     return extract_dir
 
 
