@@ -5,10 +5,13 @@ pipeline. Treat it as a pinned reference, not a one-time announcement --
 update it as new batches surface edge cases (per
 `docs/post_zip_file_format_spec.md`'s own framing).
 
-**Current scope:** the only artifact type currently dropped into Drive batch
-folders is `post_<job_name>.zip`, named per the convention in §2 below. No
-other file types (raw CSVs, `.sim` files, stray images, etc.) are expected
-there yet, and the drive-watcher and `ingestion/parsers/` code are built to
+**Current scope:** the only thing currently dropped into Drive batch
+folders is a post job, named per the convention in §2 below -- either as
+`post_<job_name>.zip`, or as an already-unzipped `post_<job_name>` folder
+(same naming, minus `.zip`; supported so its images are already
+individually Drive-linkable with no extraction step -- see §4). No other
+file types (raw CSVs, `.sim` files, stray images, etc.) are expected there
+yet, and the drive-watcher and `ingestion/parsers/` code are built to
 assume this -- they should not try to generically handle arbitrary file
 types ahead of need. Support for other artifact types -- e.g. a CSV-based
 Bayesian sweep trials log (see the open question in §6) -- is a known future
@@ -118,16 +121,21 @@ to downloading copies to a dedicated non-repo destination (e.g. a Drive
 This is explicitly a decision to revisit, not a closed one -- update this
 section if/when that happens.
 
-**Gap discovered while wiring up `ingestion/queue_consumer/`:** this
-decision assumed each scene image is individually addressable on Drive (a
-file ID/link per image). In practice, scene images only exist as entries
-*inside* the `post.zip` archive -- they're never uploaded to Drive as
-individual files, so there's no per-image Drive link to actually store.
-`format_scene_image_refs` in `ingestion/queue_consumer/main.py` is stubbed
-out pending a decision here (re-upload each image individually / link to
-the post.zip as a whole instead of per-image / adopt the "download a copy"
-fallback above) -- added to the open questions list below rather than
-picked silently.
+**Gap discovered while wiring up `ingestion/queue_consumer/`, now mostly
+resolved:** this decision assumed each scene image is individually
+addressable on Drive (a file ID/link per image), but scene images
+originally only existed as entries *inside* the `post.zip` archive -- never
+uploaded to Drive as individual files, so there was no per-image Drive link
+to store. Resolved by option (a) below: the queue consumer now extracts and
+re-uploads each image from a processed `post.zip` into a sibling
+`<job_name>_extracted` Drive folder, giving every image a real Drive file
+id either way (whether the post job arrived zipped or as an already-unzipped
+folder -- see the Current scope note above and
+`ingestion/drive-watcher/BatchFolderDetector.gs` case 4).
+`format_scene_image_refs` in `ingestion/queue_consumer/main.py` can now
+build real Drive links from that -- what's still blocking it is a separate,
+pre-existing gap: `post_zip_classifier.py`'s per-image dict shape isn't
+decided yet (see §6).
 
 ## 5. `data/results.csv` schema
 
@@ -179,12 +187,13 @@ Pulled from `docs/` into one place so they're easy to track:
       (Proposal Outline §6)
 - [ ] Retention policy for `.sim` files (who hosts them, for how long).
       (Proposal Outline §6)
-- [ ] `scene_image_refs` format: the "link only" decision (§4) assumed
-      per-image Drive links, but images only exist as `post.zip` zip
-      entries, never uploaded individually -- decide whether to re-upload
-      each image, link to the post.zip as a whole, or actually download
-      copies (the fallback already described in §4). Discovered in
-      `ingestion/queue_consumer/main.py::format_scene_image_refs`.
+- [ ] `scene_image_refs` construction: now unblocked on the Drive-linking
+      side (§4), but still waiting on `post_zip_classifier.py`'s
+      `classify_velocity_slice`/`classify_wall_shear_stress`/
+      `classify_pressure_coefficient` to decide the dict shape of
+      `classification.velocity_slices` etc. -- needed so
+      `format_scene_image_refs` knows which filenames to pull out.
+      (`ingestion/queue_consumer/main.py::format_scene_image_refs`)
 
 ## 7. Owner-initials registry
 

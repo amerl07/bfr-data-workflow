@@ -2,15 +2,15 @@
 
 Google Apps Script project that watches the shared Drive folder batch
 outputs get dropped into, and fires (push-based, not polling) when a new
-batch folder or `post.zip` shows up.
+batch folder, post.zip, or unzipped post folder shows up.
 
-**Status:** all six `.gs` files are implemented. `WatchChannel.gs`,
-`WebhookHandler.gs`, and `RenewalTrigger.gs` have been run successfully
-(watch channel registered, daily renewal trigger installed).
-`ChangeProcessor.gs`, `BatchFolderDetector.gs`, and `Dispatcher.gs` are
-implemented but not yet exercised end-to-end against a real post.zip drop
--- see "Testing the detection chain" below. The Python side that would
-consume the processing queue `Dispatcher.gs` writes to doesn't exist yet.
+**Status:** all six `.gs` files are implemented and running. Watch channel
+registered, daily renewal trigger installed, and the full detection chain
+(`doPost` → `processChanges` → `BatchFolderDetector` → `Dispatcher` → queue
+row) has been confirmed working end-to-end against a real `post.zip` drop.
+`ingestion/queue_consumer/` (Python) now reads that queue -- see its own
+docstring -- though it's still blocked downstream on `ingestion/parsers/`'s
+stubs.
 
 ## Files
 
@@ -24,15 +24,34 @@ consume the processing queue `Dispatcher.gs` writes to doesn't exist yet.
   (see "Header limitation" below for a real constraint this works around).
 - `ChangeProcessor.gs` — pulls the actual change list once notified, routes
   each change to `BatchFolderDetector` and relevant ones on to `Dispatcher`.
-  **Implemented, not yet exercised end-to-end.**
+  **Implemented, confirmed working.**
 - `BatchFolderDetector.gs` — filters the account-wide change feed down to
-  new batch folders / new post.zip files inside `WATCHED_FOLDER_ID`.
-  **Implemented.**
-- `Dispatcher.gs` — hands a detected post.zip off via a Google Sheet
+  new batch folders / new post jobs (zipped or unzipped) inside
+  `WATCHED_FOLDER_ID`. **Implemented.**
+- `Dispatcher.gs` — hands a detected post job off via a Google Sheet
   processing queue (self-provisioned on first use). **Implemented** -- see
   "Processing queue" below.
 - `RenewalTrigger.gs` — keeps the watch channel alive (channels expire; this
   is subscription bookkeeping, not file polling). **Implemented, run.**
+
+## Post job shapes: zipped or already-unzipped
+
+`BatchFolderDetector.gs` treats two Drive shapes as an equivalent "new post
+job" event, either inside a batch folder or dropped loose directly under
+`WATCHED_FOLDER_ID`:
+- `post_<job_name>.zip` (a file) -- the documented Sabalcore output.
+- `post_<job_name>` (a folder, no `.zip`) -- an already-unzipped version.
+  Supported so its scene images are already individually addressable Drive
+  files with no extraction step needed (see CONTRIBUTING.md §4's "link
+  only" image decision).
+
+Both land in the same processing queue; `ingestion/queue_consumer/` handles
+either shape (see its `materialize_post_contents`). One thing to watch: the
+queue consumer re-uploads extracted images from a *zipped* post.zip into a
+sibling `<job_name>_extracted` Drive folder so they're individually
+link-able too -- that folder is deliberately named without a `post_` prefix
+so it isn't mistaken for a new post job and reprocessed in a loop. Don't
+rename generated `*_extracted` folders to start with `post_`.
 
 ## Processing queue
 
@@ -40,18 +59,19 @@ consume the processing queue `Dispatcher.gs` writes to doesn't exist yet.
 folder id/name, `status: pending`) to a "Queue" sheet in a spreadsheet it
 creates on first use (title `BFR Drive Watcher - Processing Queue`; its ID
 is persisted in Script Properties as `DRIVE_WATCH_QUEUE_SPREADSHEET_ID` so
-later calls reuse it). Nothing reads this queue yet -- the Python job that
-would poll it and do the actual unzip/parse/`data/results.csv` work hasn't
-been built. Run `ensureQueueSheetExists()` once from the editor (same
-reason as `startWatch`/`installRenewalTrigger` -- see "Running functions"
-below) to grant the Sheets scope this needs and confirm the spreadsheet
-gets created, without waiting for a real post.zip drop to trigger it first.
+later calls reuse it). `ingestion/queue_consumer/` reads this queue and
+updates each row's status to `processing`, then `done` /
+`blocked: <reason>` / `error: <reason>`. Run `ensureQueueSheetExists()` once
+from the editor (same reason as `startWatch`/`installRenewalTrigger` -- see
+"Running functions" below) if you need to (re-)grant the Sheets scope this
+needs.
 
 ## Testing the detection chain
 
-To test: drop a file named `post_<anything>.zip` either inside a batch
+To test: drop a file named `post_<anything>.zip`, or a folder named
+`post_<anything>` (see "Post job shapes" above), either inside a batch
 folder under `WATCHED_FOLDER_ID`, or directly in `WATCHED_FOLDER_ID` itself
-(no batch folder required -- see BatchFolderDetector.gs's case 3), then
+(no batch folder required -- see BatchFolderDetector.gs's cases 3/4), then
 check the Executions log for `doPost` firing and
 `processChanges()`/`handOffNewFile` log lines, and check the queue
 spreadsheet for a new row.

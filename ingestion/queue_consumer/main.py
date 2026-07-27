@@ -1,14 +1,20 @@
 """Queue consumer entry point.
 
 Reads "pending" rows from the drive-watcher's processing-queue spreadsheet
-(see ingestion/drive-watcher/Dispatcher.gs), downloads and unzips each
-post.zip, and runs it through ingestion/parsers/. As of this writing every
-parser in ingestion/parsers/ is still a stub that raises NotImplementedError
-(see their docstrings for why -- mainly: no sample force_reports.txt yet).
-This consumer treats that as an expected, not-yet-unblocked state: it marks
-the row "blocked: <reason>" and moves on, rather than faking a result row.
-As parser stubs get filled in over time, rows will start actually reaching
-data/results.csv with no changes needed here.
+(see ingestion/drive-watcher/Dispatcher.gs). Each row's Drive file may be
+either a `post_<job_name>.zip` or an already-unzipped `post_<job_name>`
+folder (see BatchFolderDetector.gs cases 2/3 vs. 4) -- materialize_post_contents
+below handles both, downloading+unzipping+re-uploading images for the zip
+case, or just listing children for the folder case, so that either way every
+scene image ends up with a real Drive file id (see CONTRIBUTING.md §4's
+"link only" gap). That part runs regardless of parser status.
+
+What still doesn't run: the actual parsing in ingestion/parsers/ is all
+stubs that raise NotImplementedError (mainly: no sample force_reports.txt
+yet). This consumer treats that as an expected, not-yet-unblocked state: it
+marks the row "blocked: <reason>" and moves on, rather than faking a result
+row. As parser stubs get filled in over time, rows will start actually
+reaching data/results.csv with no changes needed here.
 
 One-time setup:
 1. In Google Cloud Console, create an OAuth 2.0 Client ID of type
@@ -17,24 +23,22 @@ One-time setup:
    Enable the Google Sheets API and Google Drive API for that project.
 2. Download the client secret JSON and save it as
    ingestion/queue_consumer/credentials.json (gitignored).
-3. Fill in QUEUE_SPREADSHEET_ID below -- see Dispatcher.gs's Logger.log
-   output, or the Apps Script project's Script Properties
-   (DRIVE_WATCH_QUEUE_SPREADSHEET_ID), for the actual ID.
-4. Run `python -m ingestion.queue_consumer.main` from the repo root. The
+3. Run `python -m ingestion.queue_consumer.main` from the repo root. The
    first run opens a browser for one-time consent; a token is then cached
    at ingestion/queue_consumer/token.json (also gitignored) for later runs.
 """
 
-import csv
+import io
 import tempfile
 import zipfile
+import csv
 from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from ingestion.parsers import (
     folder_name_parser,
@@ -43,9 +47,7 @@ from ingestion.parsers import (
     sim_filename_parser,
 )
 
-# TODO: fill in -- see Dispatcher.gs's Logger.log output, or Script
-# Properties (DRIVE_WATCH_QUEUE_SPREADSHEET_ID) in the Apps Script project.
-QUEUE_SPREADSHEET_ID = "TODO_QUEUE_SPREADSHEET_ID"
+QUEUE_SPREADSHEET_ID = "1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ"
 
 QUEUE_SHEET_NAME = "Queue"
 # Matches Dispatcher.gs's QUEUE_HEADERS: detected_at, file_id, file_name,
@@ -53,8 +55,12 @@ QUEUE_SHEET_NAME = "Queue"
 QUEUE_RANGE = f"{QUEUE_SHEET_NAME}!A2:F"
 STATUS_COLUMN = "F"
 
+FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
+    # Not .readonly: uploading extracted images back to Drive (see
+    # materialize_post_contents) needs write access.
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets",
 ]
 
@@ -82,11 +88,6 @@ RESULTS_FIELDS = [
 
 
 def main():
-    if QUEUE_SPREADSHEET_ID.startswith("TODO_"):
-        raise RuntimeError(
-            "QUEUE_SPREADSHEET_ID is not set -- see this module's docstring."
-        )
-
     creds = get_credentials()
     sheets = build("sheets", "v4", credentials=creds)
     drive = build("drive", "v3", credentials=creds)
@@ -144,12 +145,17 @@ def process_row(sheets, drive, row_number, row):
     set_status(sheets, row_number, "processing")
 
     try:
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            zip_path = download_file(drive, file_id, file_name, tmp_dir)
-            extracted_dir = unzip(zip_path, tmp_dir)
-            result_row = parse_post_zip(
-                extracted_dir, file_name, batch_folder_id, batch_folder_name
-            )
+        file_names, filename_to_drive_id, force_report_text = materialize_post_contents(
+            drive, file_id, file_name, batch_folder_id
+        )
+        result_row = build_result_row(
+            file_name,
+            batch_folder_id,
+            batch_folder_name,
+            file_names,
+            filename_to_drive_id,
+            force_report_text,
+        )
         append_result_row(result_row)
         set_status(sheets, row_number, "done")
     except NotImplementedError as exc:
@@ -165,7 +171,87 @@ def process_row(sheets, drive, row_number, row):
         set_status(sheets, row_number, f"error: {exc}")
 
 
-def download_file(drive, file_id, file_name, tmp_dir):
+def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
+    """Makes a post job's contents locally-readable and Drive-linkable
+    regardless of whether it arrived as a post_<job_name>.zip or an
+    already-unzipped post_<job_name> folder (BatchFolderDetector.gs cases
+    2/3 vs. 4). Returns (file_names, filename_to_drive_id, force_report_text).
+
+    This is deliberately independent of ingestion/parsers/'s stub status --
+    downloading, unzipping, listing, and re-uploading isn't "parsing", none
+    of it requires knowing anything about the files' internal formats, so
+    it runs (and is directly observable in Drive) even while the actual
+    parsing below is still blocked.
+    """
+    metadata = drive.files().get(fileId=file_id, fields="id, name, mimeType, parents").execute()
+
+    if metadata["mimeType"] == FOLDER_MIME_TYPE:
+        # Already unzipped -- every child is already an individual Drive
+        # file, nothing to extract or re-upload.
+        children = list_drive_children(drive, file_id)
+        filename_to_drive_id = {child["name"]: child["id"] for child in children}
+        force_report_id = filename_to_drive_id.get("force_reports.txt")
+        force_report_text = (
+            download_drive_file_text(drive, force_report_id) if force_report_id else ""
+        )
+        return list(filename_to_drive_id), filename_to_drive_id, force_report_text
+
+    # Zipped: download, extract locally, then re-upload the extracted
+    # images to a sibling "<job_name>_extracted" Drive folder so each one
+    # gets a real Drive file id too -- see CONTRIBUTING.md §4. Named
+    # without a "post_" prefix, and placed next to (not directly under
+    # WATCHED_FOLDER_ID unless the zip itself was loose there), so
+    # BatchFolderDetector.gs's isNewPostFolder/isNewBatchFolder never
+    # mistake this for a new post job and reprocess it.
+    parent_id = (metadata.get("parents") or [batch_folder_id])[0]
+    job_label = _strip_post_zip_suffix(file_name)
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        zip_path = download_zip(drive, file_id, file_name, tmp_dir)
+        extracted_dir = unzip(zip_path, tmp_dir)
+        file_names = [p.name for p in extracted_dir.iterdir()]
+        force_report_path = extracted_dir / "force_reports.txt"
+        force_report_text = (
+            force_report_path.read_text() if force_report_path.exists() else ""
+        )
+        uploaded = upload_extracted_images(drive, parent_id, job_label, extracted_dir)
+
+    filename_to_drive_id = {f["name"]: f["id"] for f in uploaded}
+    return file_names, filename_to_drive_id, force_report_text
+
+
+def _strip_post_zip_suffix(file_name):
+    """Best-effort label for naming the "_extracted" Drive folder only --
+    NOT the authoritative parsed job name (that's
+    sim_filename_parser.parse_post_zip_filename's job, still a stub)."""
+    label = file_name
+    if label.startswith("post_"):
+        label = label[len("post_"):]
+    if label.endswith(".zip"):
+        label = label[: -len(".zip")]
+    return label or file_name
+
+
+def list_drive_children(drive, folder_id):
+    response = (
+        drive.files()
+        .list(q=f"'{folder_id}' in parents and trashed = false", fields="files(id, name, mimeType)")
+        .execute()
+    )
+    return response.get("files", [])
+
+
+def download_drive_file_text(drive, file_id):
+    request = drive.files().get_media(fileId=file_id)
+    buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(buffer, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    return buffer.getvalue().decode("utf-8", errors="replace")
+
+
+def download_zip(drive, file_id, file_name, tmp_dir):
     request = drive.files().get_media(fileId=file_id)
     dest_path = Path(tmp_dir) / file_name
     with dest_path.open("wb") as f:
@@ -184,26 +270,45 @@ def unzip(zip_path, tmp_dir):
     return extract_dir
 
 
-def parse_post_zip(extracted_dir, post_zip_name, batch_folder_id, batch_folder_name):
-    """Runs a single post.zip's extracted contents through
-    ingestion/parsers/ and assembles a data/results.csv row per
-    post_zip_file_format_spec.md §7. Every parser call below is currently a
-    stub (raises NotImplementedError) -- see process_row's handling of
-    that.
+def upload_extracted_images(drive, parent_folder_id, job_label, local_dir):
+    folder_metadata = {
+        "name": f"{job_label}_extracted",
+        "mimeType": FOLDER_MIME_TYPE,
+        "parents": [parent_folder_id],
+    }
+    extracted_folder = drive.files().create(body=folder_metadata, fields="id").execute()
+
+    uploaded = []
+    for path in sorted(local_dir.iterdir()):
+        if not path.is_file():
+            continue
+        media = MediaFileUpload(str(path))
+        file_metadata = {"name": path.name, "parents": [extracted_folder["id"]]}
+        uploaded_file = (
+            drive.files().create(body=file_metadata, media_body=media, fields="id, name").execute()
+        )
+        uploaded.append(uploaded_file)
+
+    return uploaded
+
+
+def build_result_row(
+    file_name, batch_folder_id, batch_folder_name, file_names, filename_to_drive_id, force_report_text
+):
+    """Runs the materialized post job through ingestion/parsers/ and
+    assembles a data/results.csv row per post_zip_file_format_spec.md §7.
+    Every parser call below is currently a stub (raises NotImplementedError)
+    -- see process_row's handling of that.
     """
-    sim_metadata = sim_filename_parser.parse_post_zip_filename(post_zip_name)
+    sim_metadata = sim_filename_parser.parse_post_zip_filename(file_name)
 
     folder_metadata = None
     if batch_folder_name:
         folder_metadata = folder_name_parser.parse_batch_folder_name(batch_folder_name)
 
-    file_names = [p.name for p in extracted_dir.iterdir()]
     classification = post_zip_classifier.classify_post_zip_contents(
         file_names, batch_folder_name
     )
-
-    force_report_path = extracted_dir / "force_reports.txt"
-    force_report_text = force_report_path.read_text() if force_report_path.exists() else ""
     force_data = force_reports_parser.parse_force_report(force_report_text)
 
     isolated_vs_fullcar = sim_filename_parser.reconcile_isolated_vs_fullcar(
@@ -213,7 +318,7 @@ def parse_post_zip(extracted_dir, post_zip_name, batch_folder_id, batch_folder_n
 
     return {
         "job_name": sim_metadata.job_name,
-        "post_zip_name": post_zip_name,
+        "post_zip_name": file_name,
         "component": folder_metadata.component if folder_metadata else "",
         "sweep_type": folder_metadata.sweep_type if folder_metadata else "",
         "isolated_vs_fullcar": isolated_vs_fullcar,
@@ -224,33 +329,29 @@ def parse_post_zip(extracted_dir, post_zip_name, batch_folder_id, batch_folder_n
         "CoP": force_data.CoP,
         "swept_variable": force_data.swept_variable,
         "swept_range": force_data.swept_range,
-        "scene_image_refs": format_scene_image_refs(classification),
+        "scene_image_refs": format_scene_image_refs(classification, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
     }
 
 
-def format_scene_image_refs(classification):
-    """TODO: not implemented -- and not just because it's unimplemented like
-    the other parsers. There's a real design gap here, discovered while
-    wiring this consumer up: CONTRIBUTING.md's "link only" image-handling
-    decision assumes each scene image is individually addressable on Drive
-    (a file ID/link per image), but in practice the images only exist as
-    zip entries *inside* the post.zip -- they were never uploaded to Drive
-    as individual files, so there's no per-image Drive link to store.
+def format_scene_image_refs(classification, filename_to_drive_id):
+    """TODO: not fully implemented, but the harder half of the gap flagged
+    in CONTRIBUTING.md §4 is now resolved: filename_to_drive_id (built by
+    materialize_post_contents, regardless of whether the post job arrived
+    as an already-unzipped Drive folder or a zip that got extracted and
+    re-uploaded) gives a real Drive file id for every scene image filename.
 
-    Needs a decision before this can be implemented, along the lines of:
-      (a) extract and re-upload each image to Drive individually to get
-          real per-image links (in tension with "link only, no duplicate
-          storage" -- this would itself be a form of duplicate storage), or
-      (b) store one link to the post.zip itself in scene_image_refs
-          instead of per-image links, or
-      (c) actually adopt the "download a copy" fallback already discussed
-          as a revisit trigger in CONTRIBUTING.md §4, with images stored
-          at a non-repo destination the CSV then points to.
-    Flagging here rather than silently picking one.
+    What's still missing: post_zip_classifier.py's classify_velocity_slice/
+    classify_wall_shear_stress/classify_pressure_coefficient are themselves
+    still stubs, so the exact shape of the dicts in
+    classification.velocity_slices etc. isn't decided yet -- not something
+    to guess at here. Once it is, this should pull the relevant filenames
+    out of `classification` (categories 1-4 only, per spec §7 -- not the
+    force report, not the unclassified bucket) and look each one up in
+    filename_to_drive_id to build Drive links.
     """
     raise NotImplementedError(
-        "scene_image_refs format is undecided -- see this function's docstring"
+        "waiting on post_zip_classifier.py's per-image dict shape -- see this function's docstring"
     )
 
 

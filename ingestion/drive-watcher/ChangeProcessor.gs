@@ -57,8 +57,14 @@ function handleChange(change) {
     return;
   }
 
+  if (isNewPostFolder(file)) {
+    Logger.log('New unzipped post folder detected: %s (%s)', file.name, file.id);
+    handOffNewFile(file);
+    return;
+  }
+
   // Anything else is either outside WATCHED_FOLDER_ID entirely, or an
   // unexpected file inside a batch folder (see CONTRIBUTING.md "Current
-  // scope"). Not routed anywhere -- this pipeline only ingests post.zip
-  // right now.
+  // scope"). Not routed anywhere -- this pipeline only ingests post jobs
+  // (zipped or unzipped) right now.
 }

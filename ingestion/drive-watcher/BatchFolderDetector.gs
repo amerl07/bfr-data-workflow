@@ -17,11 +17,27 @@
  *      downstream just ends up pointing at the watched root itself rather
  *      than a meaningful batch folder -- that's an accepted tradeoff of
  *      allowing this case, not a bug.
+ *   4. A new *unzipped* post folder -- a folder (not a .zip file) named
+ *      `post_<job_name>` (post_zip_file_format_spec.md §0's naming, minus
+ *      the .zip), containing the same scene images + force_reports.txt a
+ *      post.zip would. Supported so that images inside it are already
+ *      individually addressable Drive files -- no unzip step needed, and
+ *      the "link only" image-handling decision (CONTRIBUTING.md §4) works
+ *      cleanly without needing to re-upload anything. Same
+ *      batch-folder-or-not flexibility as case 2/3.
  *
- * Current scope (see CONTRIBUTING.md): post_<job_name>.zip is the only file
- * type expected to land here (in a batch folder or directly under the
- * root). Nothing else is currently supported or expected -- isNewPostZipFile
- * validates the filename against that convention
+ * A folder this project itself creates (ingestion/queue_consumer's
+ * "<job_name>_extracted" folders, uploaded alongside a processed post.zip
+ * so its images become individually link-able too) is deliberately named
+ * to NOT start with "post_" and lands one level deeper than a batch
+ * folder, so it can't be mistaken for case 1 or case 4 and re-trigger
+ * processing of its own output.
+ *
+ * Current scope (see CONTRIBUTING.md): a post job, either as a
+ * `post_<job_name>.zip` or an already-unzipped `post_<job_name>` folder, is
+ * the only thing expected to land here (in a batch folder or directly
+ * under the root). Nothing else is currently supported or expected --
+ * isNewPostZipFile/isNewPostFolder validate against those conventions
  * (post_zip_file_format_spec.md §0); anything that doesn't match returns
  * false here and is simply not routed anywhere by ChangeProcessor, rather
  * than being treated as a different file type to route elsewhere.
@@ -33,6 +49,7 @@
 
 var FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 var POST_ZIP_NAME_PATTERN = /^post_.+\.zip$/;
+var POST_FOLDER_NAME_PATTERN = /^post_.+$/;
 
 /**
  * True if `fileId` is either a direct child of WATCHED_FOLDER_ID, or a
@@ -53,11 +70,16 @@ function isWithinWatchedFolder(fileId) {
 
 /**
  * True when `file` is a folder created directly under WATCHED_FOLDER_ID
- * (case 1 above) -- a new batch folder.
+ * (case 1 above) -- a new batch folder. Explicitly excludes anything
+ * matching POST_FOLDER_NAME_PATTERN so a case-4 unzipped post folder
+ * dropped with no batch folder isn't misdetected as case 1 instead.
  * @param {Object} file Drive file resource with at least mimeType, parents.
  */
 function isNewBatchFolder(file) {
   if (!file || file.mimeType !== FOLDER_MIME_TYPE) {
+    return false;
+  }
+  if (POST_FOLDER_NAME_PATTERN.test(file.name || '')) {
     return false;
   }
   return (file.parents || []).indexOf(WATCHED_FOLDER_ID) !== -1;
@@ -77,6 +99,27 @@ function isNewPostZipFile(file) {
     return false;
   }
   if (!POST_ZIP_NAME_PATTERN.test(file.name || '')) {
+    return false;
+  }
+  var parents = file.parents || [];
+  return parents.some(function (parentFolderId) {
+    return parentFolderId === WATCHED_FOLDER_ID || isWithinWatchedFolder(parentFolderId);
+  });
+}
+
+/**
+ * True when `file` is an already-unzipped post folder (case 4 above) --
+ * its name matches `post_<job_name>` (no .zip) and its parent is either
+ * WATCHED_FOLDER_ID itself or a folder that's a direct child of it. Same
+ * shape as isNewPostZipFile, just for the folder case.
+ * @param {Object} file Drive file resource with at least name, mimeType,
+ *     parents.
+ */
+function isNewPostFolder(file) {
+  if (!file || file.mimeType !== FOLDER_MIME_TYPE) {
+    return false;
+  }
+  if (!POST_FOLDER_NAME_PATTERN.test(file.name || '')) {
     return false;
   }
   var parents = file.parents || [];
