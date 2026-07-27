@@ -52,8 +52,12 @@ function getOrCreateQueueSheet() {
     newSheet.appendRow(QUEUE_HEADERS);
     props.setProperty(PROP_QUEUE_SPREADSHEET_ID, spreadsheet.getId());
     Logger.log('Created new queue spreadsheet: %s', spreadsheet.getUrl());
-    return newSheet;
   }
+
+  // Runs on every call, not just creation -- also retroactively relocates a
+  // queue spreadsheet that was created before GENERATED_SHEETS_FOLDER_ID
+  // was configured. Cheap no-op once the file is already in place.
+  moveToGeneratedSheetsFolder(spreadsheet.getId());
 
   var sheet = spreadsheet.getSheetByName(QUEUE_SHEET_NAME);
   if (!sheet) {
@@ -61,6 +65,27 @@ function getOrCreateQueueSheet() {
     sheet.appendRow(QUEUE_HEADERS);
   }
   return sheet;
+}
+
+/**
+ * Files `fileId` into GENERATED_SHEETS_FOLDER_ID if it isn't already there.
+ * Generic on purpose -- reusable for whatever other generated spreadsheets
+ * get added later, not just the processing queue.
+ * @param {string} fileId
+ */
+function moveToGeneratedSheetsFolder(fileId) {
+  var file = DriveApp.getFileById(fileId);
+  var parents = file.getParents();
+  var alreadyInPlace = false;
+  while (parents.hasNext()) {
+    if (parents.next().getId() === GENERATED_SHEETS_FOLDER_ID) {
+      alreadyInPlace = true;
+    }
+  }
+  if (!alreadyInPlace) {
+    file.moveTo(DriveApp.getFolderById(GENERATED_SHEETS_FOLDER_ID));
+    Logger.log('Moved %s into the generated-sheets folder.', file.getName());
+  }
 }
 
 /**

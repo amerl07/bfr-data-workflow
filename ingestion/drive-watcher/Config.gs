@@ -30,6 +30,11 @@ var PROP_WEBHOOK_TOKEN = 'DRIVE_WATCH_WEBHOOK_TOKEN';
 // Dispatcher.gs::getOrCreateQueueSheet -- rather than a manual TODO here.
 var PROP_QUEUE_SPREADSHEET_ID = 'DRIVE_WATCH_QUEUE_SPREADSHEET_ID';
 
+// Drive folder (a subfolder of WATCHED_FOLDER_ID) that generated
+// spreadsheets -- the processing queue, and any future ones -- get filed
+// into. See Dispatcher.gs::moveToGeneratedSheetsFolder.
+var GENERATED_SHEETS_FOLDER_ID = '1QCln4vmn7F-QdfQjA5dXi092Vydts2z_';
+
 /**
  * TODO: after deploying this project as a Web App (Deploy > New deployment
  * > Web app), paste the resulting /exec URL here. Drive push notifications
