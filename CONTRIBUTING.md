@@ -152,8 +152,9 @@ One row per `post.zip` processed. See
 | `isolated_vs_fullcar` | `FC` absence and/or `ISO_` prefix -- see the cross-check open question in §2 |
 | `date` | `YYYYMMDD` from filename |
 | `owner_initials` | From filename |
-| `CL`, `CD`, `CoP` | Parsed from `force_reports.txt` (§3.5) |
-| `swept_variable`, `swept_range` | From `force_reports.txt`, **if present** -- unconfirmed, see open questions |
+| `CL`, `CD` | **Not currently populated** -- `force_reports.txt` only has raw forces (Newtons), not coefficients; computing these needs reference constants not present in the file. See open questions. |
+| `CoP` | Parsed from `force_reports.txt`'s unitless `CoP` label (§3.5) -- there's also a separate `CoP meters` value in the file not currently mapped anywhere; confirm this is the right one |
+| `swept_variable`, `swept_range` | **Confirmed absent** from `force_reports.txt` (a single-run export has no sweep info at all) -- would need to come from elsewhere, e.g. the sweep tool's own trials log (Proposal Outline §4.3), if captured at all |
 | `scene_image_refs` | `;`-joined Drive view links, one per scene image (§4) |
 | `source_drive_folder` | Path/link to the originating batch folder |
 
@@ -163,8 +164,31 @@ Pulled from `docs/` into one place so they're easy to track:
 
 - [ ] Does the Bayesian sweep macro output its own trials log? Format?
       (Proposal Outline §6)
-- [ ] Confirm `force_reports.txt` includes swept variable + range, not just
-      CL/CD/CoP at each point. (Proposal Outline §6, spec §5)
+- [x] ~~Confirm `force_reports.txt` includes swept variable + range, not
+      just CL/CD/CoP at each point.~~ **Answered, from a real sample
+      (docs/force_reports.txt): no.** A single-run export has no swept
+      variable/range at all -- just raw forces, CoP, and a couple of header
+      comments. (Proposal Outline §6, spec §5)
+- [ ] How to get real `CL`/`CD` coefficients: `force_reports.txt` only has
+      raw forces in Newtons ("Total DF", "Total Drag", etc.), not
+      dimensionless coefficients. Computing one needs a reference velocity,
+      reference area, and air density (F = 0.5 · ρ · V² · A · C) -- none of
+      which appear in the file. The file's header references
+      "BFR_CFD_Standards" as the convention these raw values follow,
+      implying such reference constants exist as a team convention
+      somewhere -- need to find/confirm them, or decide to store raw forces
+      in `data/results.csv` instead of coefficients.
+      (`ingestion/parsers/force_reports_parser.py`)
+- [ ] `force_reports.txt` values are explicitly labeled "half-car,
+      undoubled" in the file's own header comment. Whether to double them
+      before storing (to represent the full car) or keep them as-is (with
+      that caveat preserved, e.g. in a notes field) isn't decided.
+      (`ingestion/parsers/force_reports_parser.py`)
+- [ ] `force_reports.txt` has both a unitless `CoP` value and a separate
+      `CoP meters` value. `data/results.csv`'s `CoP` column currently takes
+      the unitless one as the more literal name match -- confirm that's
+      actually the right one, or whether both should be kept.
+      (`ingestion/parsers/force_reports_parser.py`)
 - [ ] `x_`/`y_` slice filename sign convention -- double-underscore means
       negative or zero/positive? Contradicted in the one sample batch.
       (spec §1)

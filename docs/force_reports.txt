@@ -1,0 +1,17 @@
+# BFR report export   run: NC_B27_UT_Cornering_No_Fillets_20260724
+# raw report values (half-car, undoubled) per BFR_CFD_Standards
+# DF sign convention: downforce reads negative
+
+Body DF                                               10.759581  N
+CoP                                                   53.437586  
+CoP meters                                             0.841642  m
+RW Drag                                               40.157203  N
+FW DF                                                -60.274081  N
+RW DF                                                -91.399461  N
+Total Drag                                            90.462571  N
+Total DF                                            -187.845544  N
+UT DF                                                -58.919861  N
+Cell count                                     113474511.000000  
+Total Aero DF                                       -195.549623  N
+Wheel DF                                             -51.215782  N
+Whisker DF                                             4.284199  N

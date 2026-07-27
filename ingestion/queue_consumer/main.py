@@ -9,12 +9,15 @@ case, or just listing children for the folder case, so that either way every
 scene image ends up with a real Drive file id (see CONTRIBUTING.md §4's
 "link only" gap). That part runs regardless of parser status.
 
-What still doesn't run: the actual parsing in ingestion/parsers/ is all
-stubs that raise NotImplementedError (mainly: no sample force_reports.txt
-yet). This consumer treats that as an expected, not-yet-unblocked state: it
-marks the row "blocked: <reason>" and moves on, rather than faking a result
-row. As parser stubs get filled in over time, rows will start actually
-reaching data/results.csv with no changes needed here.
+What still doesn't fully run: sim_filename_parser and post_zip_classifier
+are implemented; force_reports_parser now parses the real (confirmed)
+format too, but deliberately doesn't populate CL/CD (no reference constants
+to compute a coefficient from raw Newtons -- see its docstring) or
+swept_variable/swept_range (confirmed absent from the format). Blocked past
+that point on reconcile_isolated_vs_fullcar and, when a batch folder is
+involved, folder_name_parser -- still stubs. This consumer treats a stub's
+NotImplementedError as an expected, not-yet-unblocked state: it marks the
+row "blocked: <reason>" and moves on, rather than faking a result row.
 
 One-time setup:
 1. In Google Cloud Console, create an OAuth 2.0 Client ID of type
