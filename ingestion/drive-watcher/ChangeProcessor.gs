@@ -9,7 +9,7 @@ var CHANGES_LIST_FIELDS =
 /**
  * One-time manual setup (editor UI, not clasp run -- see README's "Running
  * functions" note): installs a polling fallback trigger that calls
- * processChanges() directly every 5 minutes, regardless of whether Drive's
+ * processChanges() directly every minute, regardless of whether Drive's
  * push notifications are reaching doPost.
  *
  * Not the originally intended design (see WatchChannel.gs's module
@@ -32,10 +32,10 @@ function installPollingTrigger() {
 
   ScriptApp.newTrigger('processChanges')
     .timeBased()
-    .everyMinutes(5)
+    .everyMinutes(1)
     .create();
 
-  Logger.log('Installed 5-minute polling trigger for processChanges().');
+  Logger.log('Installed 1-minute polling trigger for processChanges().');
 }
 
 /**

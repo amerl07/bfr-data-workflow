@@ -12,7 +12,7 @@ chain (`processChanges` → `BatchFolderDetector` → `Dispatcher` → queue row
 has been confirmed working end-to-end against real `post.zip` drops.
 `ingestion/queue_consumer/` (Python) now reads that queue -- see its own
 docstring -- though it's still blocked downstream on `ingestion/parsers/`'s
-stubs. Detection itself runs on a 5-minute polling trigger
+stubs. Detection itself runs on a 1-minute polling trigger
 (`installPollingTrigger()`), not the push-notification path.
 
 ## Files
@@ -92,7 +92,7 @@ To test: drop a file named `post_<anything>.zip`, or a folder named
 `post_<anything>` (see "Post job shapes" above), either inside a batch
 folder under `WATCHED_FOLDER_ID`, or directly in `WATCHED_FOLDER_ID` itself
 (no batch folder required -- see BatchFolderDetector.gs's cases 3/4), then
-wait up to 5 minutes for the polling trigger and check the Executions log
+wait up to a minute for the polling trigger and check the Executions log
 for `processChanges()`/`handOffNewFile` log lines, and check the queue
 spreadsheet for a new row. (If push notifications are also running --
 optional, see above -- you might additionally see a `doPost` entry, but
@@ -106,7 +106,7 @@ it) the first time `processChanges()` ran, whether or not it matched. To
 retest an already-uploaded file after a detection-logic change, either
 re-upload it (or make any edit that generates a fresh Drive change event),
 or run `processChanges()` manually from the editor to force an immediate
-check instead of waiting for the next 5-minute tick.
+check instead of waiting for the next 1-minute tick.
 
 ## Deployments are frozen snapshots -- `clasp push` alone doesn't update them
 
@@ -172,7 +172,7 @@ for (see the old `WEBHOOK_URL` comment history in `Config.gs`, and "Why not
 a simple time-driven trigger?" below for why push was tried first).
 
 **What's live now:** `ChangeProcessor.installPollingTrigger()` installs a
-5-minute time-driven trigger calling `processChanges()` directly --
+1-minute time-driven trigger calling `processChanges()` directly --
 detection no longer depends on `doPost` firing at all. The push
 infrastructure (`WatchChannel.gs`, `WebhookHandler.gs`,
 `RenewalTrigger.gs`) is left running, not removed -- harmless, and if it
