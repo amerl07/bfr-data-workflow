@@ -412,7 +412,26 @@ def set_status(sheets, row_number, status):
 
 
 def append_result_row(row):
+    """Appends one row to data/results.csv, guarding against the file not
+    already ending in a newline -- confirmed to actually happen in practice
+    (2026-07-27): opening in append mode and writing a row assumes the
+    existing content is already newline-terminated, and if it isn't, the
+    new row gets concatenated directly onto the end of the previous line
+    instead of starting a fresh one. Checked (not just assumed) on every
+    call rather than only fixed once, since something outside this script's
+    control -- editor/linter, manual edits -- can just as easily strip a
+    trailing newline between two runs.
+    """
+    if RESULTS_CSV_PATH.exists() and RESULTS_CSV_PATH.stat().st_size > 0:
+        with RESULTS_CSV_PATH.open("rb") as f:
+            f.seek(-1, 2)
+            needs_newline = f.read(1) not in (b"\n", b"\r")
+    else:
+        needs_newline = False
+
     with RESULTS_CSV_PATH.open("a", newline="") as f:
+        if needs_newline:
+            f.write("\n")
         csv.DictWriter(f, fieldnames=RESULTS_FIELDS).writerow(row)
 
 
