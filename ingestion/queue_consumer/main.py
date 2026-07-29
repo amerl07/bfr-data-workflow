@@ -67,6 +67,10 @@ from ingestion.parsers import (
 
 QUEUE_SPREADSHEET_ID = "1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ"
 
+# Must match ingestion/drive-watcher/Config.gs's WATCHED_FOLDER_ID -- used
+# as materialize_post_contents' last-resort fallback parent (see there).
+WATCHED_FOLDER_ID = "1XhrMoU9ermfWZocgzl05-cHdmZexGKih"
+
 QUEUE_SHEET_NAME = "Queue"
 # Matches Dispatcher.gs's QUEUE_HEADERS: detected_at, file_id, file_name,
 # batch_folder_id, batch_folder_name, status.
@@ -235,7 +239,17 @@ def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
     # WATCHED_FOLDER_ID unless the zip itself was loose there), so
     # BatchFolderDetector.gs's isNewPostFolder/isNewBatchFolder never
     # mistake this for a new post job and reprocess it.
-    parent_id = (metadata.get("parents") or [batch_folder_id])[0]
+    #
+    # Falls back to WATCHED_FOLDER_ID, not just batch_folder_id, when
+    # metadata["parents"] comes back empty -- confirmed to happen in
+    # practice (2026-07-29) for a loose zip (no batch folder) processed
+    # very soon after the reading identity's Drive access was granted,
+    # likely a permission-propagation delay. Without this, an empty
+    # batch_folder_id (the loose-zip-with-no-batch-folder case) combines
+    # with the empty parents to send Drive an empty-string parent id,
+    # which Drive reports back as a cryptic "File not found: ." 404 rather
+    # than anything actionable.
+    parent_id = (metadata.get("parents") or [batch_folder_id])[0] or WATCHED_FOLDER_ID
     job_label = _strip_post_zip_suffix(file_name)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
