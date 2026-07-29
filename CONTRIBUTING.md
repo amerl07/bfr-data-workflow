@@ -196,9 +196,16 @@ Pulled from `docs/` into one place so they're easy to track:
       (spec §3)
 - [ ] Is `CpT_Sweep.png` a summary/sweep plot distinct from the directional
       CP scenes, or should it be classified the same way? (spec §3)
-- [ ] Drive push-notification setup: does `script.google.com` work as a
+- [x] ~~Drive push-notification setup: does `script.google.com` work as a
       webhook receiver without extra domain verification for this project's
-      setup? (`ingestion/drive-watcher/README.md`)
+      setup?~~ **Deprioritized, not conclusively answered.** Push
+      notifications never reliably reached `doPost` even after fixing two
+      real bugs (stale deployment, too-infrequent channel renewal) --
+      domain verification is the leading unconfirmed suspect. Rather than
+      keep chasing it, `processChanges()` now runs on a 1-minute polling
+      trigger instead; the push infrastructure is left running (faster if
+      it ever starts working) but nothing depends on it. See
+      `ingestion/drive-watcher/README.md`.
 - [ ] How do people currently organize Sabalcore downloads in Drive, if at
       all -- any existing partial convention to build from? (Proposal
       Outline §6)

@@ -1,0 +1,56 @@
+name: Run queue consumer
+
+# Scheduled replacement for manually running
+# `.venv/bin/python -m ingestion.queue_consumer.main`. Mirrors the
+# drive-watcher's own move from push notifications to a polling trigger
+# (see ingestion/drive-watcher/README.md) -- same tradeoff, just one layer
+# further down the pipeline: a dumb timer beats a push mechanism that has
+# to actually fire.
+on:
+  schedule:
+    # Every 10 minutes. GitHub can delay scheduled runs under load,
+    # especially right on the hour -- fine here, this is a fallback poller
+    # with no latency guarantee, not a real-time trigger.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  # Prevents two runs from racing on the same queue rows or both appending
+  # to data/results.csv and fighting over the push.
+  group: queue-consumer
+  cancel-in-progress: false
+
+jobs:
+  consume:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Write service account key
+        env:
+          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
+        run: echo "$GCP_SERVICE_ACCOUNT_JSON" > ingestion/queue_consumer/service-account.json
+
+      - name: Run queue consumer
+        run: python -m ingestion.queue_consumer.main
+
+      - name: Commit data/results.csv if it changed
+        run: |
+          if git diff --quiet -- data/results.csv; then
+            echo "No changes to data/results.csv"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/results.csv
+            git commit -m "Auto-update data/results.csv from queue consumer"
+            git push
+          fi

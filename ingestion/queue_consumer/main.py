@@ -19,16 +19,30 @@ involved, folder_name_parser -- still stubs. This consumer treats a stub's
 NotImplementedError as an expected, not-yet-unblocked state: it marks the
 row "blocked: <reason>" and moves on, rather than faking a result row.
 
-One-time setup:
-1. In Google Cloud Console, create an OAuth 2.0 Client ID of type
-   "Desktop app" (this needs a real GCP project -- unlike the Apps Script
-   side, there's no way around that for external API access from Python).
-   Enable the Google Sheets API and Google Drive API for that project.
-2. Download the client secret JSON and save it as
-   ingestion/queue_consumer/credentials.json (gitignored).
-3. Run `python -m ingestion.queue_consumer.main` from the repo root. The
-   first run opens a browser for one-time consent; a token is then cached
-   at ingestion/queue_consumer/token.json (also gitignored) for later runs.
+Runs two ways -- see get_credentials():
+- Scheduled/automated (.github/workflows/queue_consumer.yml): a service
+  account, no browser involved. One-time setup:
+  1. In Google Cloud Console, create a Service Account (same project as
+     below, or a new one) and enable the Google Sheets API and Google Drive
+     API for that project.
+  2. Create a JSON key for it and note its "client_email" field.
+  3. Share the watched Drive folder (Config.gs's WATCHED_FOLDER_ID) AND the
+     queue spreadsheet (QUEUE_SPREADSHEET_ID below) with that client_email
+     as Editor -- service accounts don't inherit access from whoever
+     created them, they need to be invited like any other collaborator.
+  4. Paste the full key JSON into a GitHub repo secret named
+     GCP_SERVICE_ACCOUNT_JSON (Settings -> Secrets and variables -> Actions).
+     The workflow writes it to ingestion/queue_consumer/service-account.json
+     at runtime; that path is gitignored so it never gets committed.
+- Interactive/local: OAuth installed-app flow, used automatically when
+  service-account.json isn't present.
+  1. In Google Cloud Console, create an OAuth 2.0 Client ID of type
+     "Desktop app". Enable the same two APIs.
+  2. Download the client secret JSON and save it as
+     ingestion/queue_consumer/credentials.json (gitignored).
+  3. Run `python -m ingestion.queue_consumer.main` from the repo root. The
+     first run opens a browser for one-time consent; a token is then cached
+     at ingestion/queue_consumer/token.json (also gitignored) for later runs.
 """
 
 import io
@@ -38,6 +52,7 @@ import csv
 from pathlib import Path
 
 from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -70,6 +85,7 @@ SCOPES = [
 _MODULE_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = _MODULE_DIR / "credentials.json"
 TOKEN_PATH = _MODULE_DIR / "token.json"
+SERVICE_ACCOUNT_PATH = _MODULE_DIR / "service-account.json"
 
 RESULTS_CSV_PATH = _MODULE_DIR.parent.parent / "data" / "results.csv"
 RESULTS_FIELDS = [
@@ -105,8 +121,16 @@ def main():
 
 
 def get_credentials():
-    """OAuth installed-app flow, with the resulting token cached locally so
-    only the first run needs an interactive browser consent."""
+    """Service account first -- what the scheduled GitHub Actions run uses
+    (see module docstring, .github/workflows/queue_consumer.yml), no
+    browser needed. Falls back to the OAuth installed-app flow for
+    interactive local runs that don't have a service-account.json, with the
+    resulting token cached locally so only the first run needs consent."""
+    if SERVICE_ACCOUNT_PATH.exists():
+        return service_account.Credentials.from_service_account_file(
+            str(SERVICE_ACCOUNT_PATH), scopes=SCOPES
+        )
+
     creds = None
     if TOKEN_PATH.exists():
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
