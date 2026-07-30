@@ -213,6 +213,13 @@ above for why this project ended up on a polling trigger anyway.
 5. Optional, best-effort (push isn't relied on, but doesn't hurt to have
    running too): `startWatch()` to register a push-notification channel,
    then `installRenewalTrigger()` to keep it alive.
+6. Run `Dispatcher.gs::protectQueueSheet()` once from the editor -- adds a
+   warning-only protection over the queue sheet so an accidental
+   fill-handle/paste/Smart-Fill click in the browser (confirmed to actually
+   corrupt rows in practice, 2026-07-29) surfaces a warning instead of
+   silently overwriting a row. Doesn't affect the automation at all
+   (warning-only protections don't block API/script writes) -- just adds
+   friction for manual edits.
 
 ## Running functions: editor UI, not `clasp run`
 

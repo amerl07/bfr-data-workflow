@@ -144,3 +144,41 @@ function ensureQueueSheetExists() {
   var sheet = getOrCreateQueueSheet();
   Logger.log('Queue sheet ready: %s', sheet.getParent().getUrl());
 }
+
+var QUEUE_PROTECTION_DESCRIPTION =
+  'BFR Drive Watcher queue -- edited by automation; manual edits can corrupt in-flight rows';
+
+/**
+ * One-time manual setup (editor UI, not clasp run -- same reason as
+ * ensureQueueSheetExists above): adds a warning-only protection over the
+ * whole queue sheet, so an accidental fill-handle drag / paste / "Smart
+ * Fill" suggestion click in the browser -- confirmed to actually happen
+ * (2026-07-29: a queue row, and separately the header row, both got every
+ * column overwritten with a single column's value after the sheet was open
+ * in a browser) -- surfaces a "you're editing a protected range" warning
+ * instead of silently corrupting a row. Sheet-level (not a fixed A1:F-style
+ * range) so it automatically covers rows appended after this runs, not
+ * just what exists right now.
+ *
+ * Warning-only, not a hard restriction: it has no effect at all on
+ * automated writes (Apps Script's own triggers, and the Python consumer's
+ * Sheets API calls both bypass UI-only warnings entirely), and a human can
+ * still click through and edit if they really need to -- this is a speed
+ * bump against accidents, not access control. Safe to re-run: removes any
+ * protection this function previously added first, rather than stacking
+ * duplicates.
+ */
+function protectQueueSheet() {
+  var sheet = getOrCreateQueueSheet();
+
+  sheet.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(function (protection) {
+    if (protection.getDescription() === QUEUE_PROTECTION_DESCRIPTION) {
+      protection.remove();
+    }
+  });
+
+  var protection = sheet.protect().setDescription(QUEUE_PROTECTION_DESCRIPTION);
+  protection.setWarningOnly(true);
+
+  Logger.log('Warning-only protection applied to the whole "%s" sheet.', sheet.getName());
+}
