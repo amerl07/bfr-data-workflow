@@ -8,10 +8,10 @@ name: Run queue consumer
 # to actually fire.
 on:
   schedule:
-    # Every 10 minutes. GitHub can delay scheduled runs under load,
+    # Every 5 minutes. GitHub can delay scheduled runs under load,
     # especially right on the hour -- fine here, this is a fallback poller
     # with no latency guarantee, not a real-time trigger.
-    - cron: "*/10 * * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
