@@ -1,0 +1,67 @@
+name: Deploy web app to GitHub Pages
+
+# Builds the Next.js static export in web/ and publishes it to GitHub
+# Pages. Not triggered by data/results.csv changes -- the deployed site
+# fetches that file live from raw.githubusercontent.com at runtime, so new
+# pipeline rows show up without a redeploy (see web/README or the app's
+# fetch layer in web/lib/data.ts).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - uses: actions/configure-pages@v5
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: web
+        run: npm test
+
+      - name: Build static export
+        working-directory: web
+        run: npm run build
+        env:
+          # Tells next.config.ts to prefix output with the /bfr-data-workflow
+          # project-pages path; unset for local dev/build.
+          GITHUB_PAGES: "true"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

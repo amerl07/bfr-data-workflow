@@ -17,8 +17,11 @@ are out of current scope -- see `CONTRIBUTING.md`'s "Current scope" note),
 so rows involving a batch folder are left "blocked" in the queue rather
 than silently skipped or faked.
 
-**Next planned step:** a small web front-end for querying `data/results.csv`
-(separate session/effort, not started yet).
+**Web front-end:** `web/` is a Next.js static site (Explorer, Simulation
+Detail, Compare, Performance Explorer, Analytics Dashboard) that fetches
+`data/results.csv` live at runtime -- see `web/README.md`. Deploys to GitHub
+Pages via `.github/workflows/deploy.yml`; Pages source still needs to be
+switched to "GitHub Actions" in repo Settings (one-time, not yet done).
 
 ## Tools & where things live
 
@@ -108,18 +111,17 @@ workflow was meant to keep it current without anyone running the consumer
 by hand, but see "Automated ingestion" above -- for now that still means
 running it manually.)
 
-**Next planned work: a small web front-end for querying `data/results.csv`**
-(not started yet -- planned for a separate session). Schema to build
-against is in CONTRIBUTING.md §4 -- `component`, `sweep_type`,
-`isolated_vs_fullcar`, `date`, `owner_initials` as filterable/groupable
-fields, plus the per-label force columns (`body_df`, `rw_drag`, etc.) as
-sortable numeric columns, alongside the `raw_force_values`/`CoP`/
-`CoP_meters`/`scene_image_refs` catch-alls. Likely next step after that:
-migrate storage to a proper queryable database (e.g. a hosted Postgres)
-that both the consumer writes to and the front-end reads from, rather than
-parsing CSV on every request -- revisit once concurrent writes, row
-volume, or the CSV-as-git-history noise become actual problems, or once
-the front-end's query needs outgrow what's comfortable against a flat file.
+**Web front-end:** `web/` queries `data/results.csv` client-side (see
+"Web front-end" above and `web/README.md`) -- filterable/groupable on
+`component`, `sweep_type`, `isolated_vs_fullcar`, `date`, `owner_initials`,
+sortable on the per-label force columns, plus `raw_force_values`/`CoP`/
+`CoP_meters`/`scene_image_refs` as detail-page/catch-all fields, per
+CONTRIBUTING.md §4. Likely next step: migrate storage to a proper
+queryable database (e.g. a hosted Postgres) that both the consumer writes
+to and the front-end reads from, rather than parsing CSV on every
+request -- revisit once concurrent writes, row volume, or the
+CSV-as-git-history noise become actual problems, or once the front-end's
+query needs outgrow what's comfortable against a flat file.
 
 ## Docs
 
