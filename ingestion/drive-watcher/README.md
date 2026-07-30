@@ -86,6 +86,27 @@ needs.
   diagnosis), but switching to a formatted date *string*
   (`Utilities.formatDate(...)`) instead of a raw `Date` object avoids it.
 
+**Two more real bugs found and fixed here (2026-07-29) -- same corrupted-row
+*symptom* as above (every column ends up holding one column's value), but
+two entirely different root causes, discovered live during real testing:**
+- **Duplicate queue rows for the same `file_id`.** Drive can emit more than
+  one change event for the same file (confirmed happening -- e.g. a
+  permission grant propagating, not a new upload), and `handOffNewFile` had
+  no dedup check, so every matching event got its own row. Fixed:
+  `isAlreadyQueued(sheet, fileId)` checks column B before appending, skips
+  if that `file_id` already has a row (any status).
+- **Accidental UI edits.** With the Queue sheet open in a browser, a data
+  row and separately the header row each had every column overwritten with
+  a single column's value -- confirmed (by re-diffing the deployed script
+  against the fixed source both times) to *not* be a code bug; it's the
+  signature of a fill-handle drag, paste, or an accepted "Smart Fill"
+  suggestion. Mitigated, not prevented outright: `protectQueueSheet()`
+  (one-time manual run, see "One-time manual deploy steps" below) adds a
+  warning-only sheet protection, so a human editing via the browser gets a
+  "you're editing a protected range" prompt first. Warning-only protections
+  have no effect on API/script writes, so this doesn't touch the
+  automation.
+
 ## Testing the detection chain
 
 To test: drop a file named `post_<anything>.zip`, or a folder named

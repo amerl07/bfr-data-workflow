@@ -166,6 +166,18 @@ One row per `post.zip` processed. See
 
 Pulled from `docs/` into one place so they're easy to track:
 
+- [ ] **GitHub Actions `schedule:` trigger for `queue_consumer.yml` is
+      unreliable.** Found 2026-07-29: observed runs 1.5-3 hours apart
+      against a 5-10 minute configured interval. Confirmed to be a GitHub
+      platform limitation (the `schedule:` event is explicitly best-effort/
+      low-priority and can be delayed or dropped for hours, especially on
+      private repos), not something fixable by changing the cron
+      expression. `workflow_dispatch` runs (manual or API-triggered) don't
+      have this problem. Decided for now: run the consumer manually. Real
+      fix not yet implemented -- either an external cron service (e.g.
+      cron-job.org) calling the `workflow_dispatch` REST API on a real
+      schedule, or moving the consumer off GitHub Actions onto Google Cloud
+      Scheduler + Cloud Function/Run. See README.md "Automated ingestion".
 - [ ] Does the Bayesian sweep macro output its own trials log? Format?
       (Proposal Outline §6)
 - [x] ~~Confirm `force_reports.txt` includes swept variable + range, not
