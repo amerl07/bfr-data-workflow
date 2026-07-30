@@ -1,20 +1,22 @@
 """Parses Sabalcore .sim and post.zip file names.
 
-Convention (Sabalcore Usage Guide; post_zip_file_format_spec.md §0):
+Convention (docs/Aero Subsystem Data Workflow — Proposal Outline.md §5,
+updated 2026-07-29 -- this is now the single naming layer this parser reads;
+the separate Drive batch-folder convention and ISO_ prefix scheme are
+superseded by it):
 
-    <INITIALS>_<descriptor>_<YYYYMMDD>.sim
+    {INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.sim
 
-Isolated-part runs prefix the descriptor with ISO_, e.g.
-DY_ISO_RWv3_20260709.sim. Confirmed against every example filename in the
-docs (DY_B27_baseline_20260601, MT_RWsweep_v2_20260610, DY_ISO_RWv3_20260709)
-plus one real upload (NC_B27_UT_Cornering_Outwash_20260726) -- the
-descriptor itself may contain underscores, so parsing anchors on the first
-underscore (initials, always letters) and the last 8-digit run (date),
-treating everything in between as the descriptor.
+e.g. NC_UT_NoFillets_Cornering_20260724, YL_WSK_VariableAoA_Straight_20260529
+-- five plain (no-underscore) tokens. Component codes: RW, FW, UT, WSK, BW,
+FC (Proposal Outline §5); sweep type codes: CORNER, STRAIGHT, VEL, YAW, RH,
+AOA, COMBO -- neither is validated here (parse whatever's actually there,
+per the "ignore undefined, don't invent" approach used for force labels
+too). Absence of FC as the component implies an isolated-component run
+(Proposal Outline §5's rule) -- there's no separate ISO_ prefix anymore.
 
 post.zip names wrap the .sim base: post_<job_name>.zip, i.e.
-post_<INITIALS>_<descriptor>_<YYYYMMDD>.zip (or with ISO_ in the
-descriptor).
+post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip.
 """
 
 import re
@@ -26,24 +28,28 @@ from typing import Optional
 class SimFileMetadata:
     raw_name: str
     owner_initials: str
-    descriptor: str
+    component: str
+    description: str
+    sweep_type: str
     date: str
-    is_isolated: bool
+    is_full_car: bool
     job_name: str
 
 
-# Anchors: initials are letters only (every example: DY, MT, YM, LC, NC),
-# date is 8 digits. `.+` for descriptor is greedy, so it naturally backtracks
-# to match the *last* `_<8 digits>` in the string as the date -- correct
-# even when the descriptor itself contains underscores (e.g. "RWsweep_v2",
-# "B27_UT_Cornering_Outwash").
-_JOB_NAME_PATTERN = re.compile(r"^(?P<initials>[A-Za-z]+)_(?P<descriptor>.+)_(?P<date>\d{8})$")
+# Five plain tokens (letters/digits, no underscores) plus an 8-digit date --
+# a fixed-shape split, not a greedy "everything in between" match, since the
+# convention now names each field individually instead of leaving a variable
+# free-form descriptor.
+_JOB_NAME_PATTERN = re.compile(
+    r"^(?P<initials>[A-Za-z]+)_(?P<component>[A-Za-z0-9]+)_(?P<description>[A-Za-z0-9]+)"
+    r"_(?P<sweep_type>[A-Za-z0-9]+)_(?P<date>\d{8})$"
+)
 
-_ISO_PREFIX = "ISO_"
+_FULL_CAR_COMPONENT = "FC"
 
 
 def parse_sim_filename(filename: str) -> SimFileMetadata:
-    """Parse a `<INITIALS>_<descriptor>_<YYYYMMDD>.sim` filename."""
+    """Parse a `{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.sim` filename."""
     if not filename.endswith(".sim"):
         raise ValueError(f"expected a .sim filename, got: {filename!r}")
     job_name = filename[: -len(".sim")]
@@ -70,67 +76,52 @@ def _parse_job_name(raw_name: str, job_name: str) -> SimFileMetadata:
     match = _JOB_NAME_PATTERN.match(job_name)
     if not match:
         raise ValueError(
-            f"job name does not match <INITIALS>_<descriptor>_<YYYYMMDD>: {job_name!r}"
+            "job name does not match "
+            f"{{INITIALS}}_{{COMPONENT}}_{{DESCRIPTION}}_{{SWEEPTYPE}}_{{YYYYMMDD}}: {job_name!r}"
         )
-
-    initials = match.group("initials")
-    descriptor = match.group("descriptor")
-    date = match.group("date")
-
-    # Decision (was an open TODO): is_isolated is the authoritative signal;
-    # descriptor is stored with ISO_ stripped so downstream consumers don't
-    # need to re-check the prefix themselves. `job_name` keeps ISO_ (it's
-    # the literal Sabalcore run-directory name, unmodified).
-    is_isolated = descriptor.startswith(_ISO_PREFIX)
-    if is_isolated:
-        descriptor = descriptor[len(_ISO_PREFIX) :]
 
     return SimFileMetadata(
         raw_name=raw_name,
-        owner_initials=initials,
-        descriptor=descriptor,
-        date=date,
-        is_isolated=is_isolated,
+        owner_initials=match.group("initials"),
+        component=match.group("component"),
+        description=match.group("description"),
+        sweep_type=match.group("sweep_type"),
+        date=match.group("date"),
+        is_full_car=match.group("component") == _FULL_CAR_COMPONENT,
         job_name=job_name,
     )
 
 
 def reconcile_isolated_vs_fullcar(
-    folder_is_full_car: Optional[bool], sim_is_isolated: bool
+    folder_is_full_car: Optional[bool], sim_is_full_car: bool
 ) -> str:
-    """Reconcile the two independent isolated-vs-fullcar signals into one
-    of "full_car", "isolated", or a "CONFLICT: ..." string.
+    """Reconcile the Drive-folder and filename isolated-vs-fullcar signals
+    into one of "full_car", "isolated", or a "CONFLICT: ..." string.
 
-    Background (post_zip_file_format_spec.md §0/§7): the Drive batch-folder
-    convention encodes isolated-vs-fullcar via absence of the FC component
-    code, while the Sabalcore .sim filename encodes it via an independent
-    ISO_ prefix on the descriptor. These are two signals at two different
-    naming layers and are not guaranteed to agree.
+    Background: originally two independent naming layers -- a Drive
+    batch-folder convention and a separate Sabalcore-filename ISO_ prefix --
+    that could disagree. The filename convention (see this module's
+    docstring) now encodes it directly via the COMPONENT token
+    (SimFileMetadata.is_full_car), and the Drive batch-folder layer is out
+    of current scope (folder_name_parser is still a stub, batch folders
+    aren't used) -- so `folder_is_full_car` is normally None and this just
+    returns the filename's signal. Kept as a two-signal reconciliation
+    (rather than simplified to filename-only) so a real batch-folder signal,
+    if that ever comes back into scope, still gets cross-checked and
+    disagreements surfaced rather than silently overridden.
 
-    Decision: option (c) from the earlier open question -- cross-check both
-    when both are available, and surface a disagreement rather than
-    silently picking one. `folder_is_full_car` is frequently None now that
-    post.zip can be dropped with no batch folder at all (see CONTRIBUTING.md
-    "Current scope") -- in that case the ISO_/sim signal, which is always
-    available, is used alone since there's nothing to cross-check against.
-    On disagreement, the conflict string itself becomes the CSV row's
-    `isolated_vs_fullcar` value -- visible directly in data/results.csv to
-    whoever reviews it, rather than hidden in a log only.
-
-    @param folder_is_full_car: True if the Drive batch folder's component
-        code is FC, False if a non-FC component code is present, None if
-        there's no batch folder to read this from at all.
-    @param sim_is_isolated: SimFileMetadata.is_isolated from the .sim /
-        post.zip filename.
+    @param folder_is_full_car: True/False if a Drive batch folder's
+        component code is available to check against, None if there's no
+        batch folder (the common case right now).
+    @param sim_is_full_car: SimFileMetadata.is_full_car from the post.zip
+        filename.
     """
-    sim_says_full_car = not sim_is_isolated
-
     if folder_is_full_car is None:
-        return "full_car" if sim_says_full_car else "isolated"
+        return "full_car" if sim_is_full_car else "isolated"
 
-    if folder_is_full_car == sim_says_full_car:
+    if folder_is_full_car == sim_is_full_car:
         return "full_car" if folder_is_full_car else "isolated"
 
     folder_label = "full_car" if folder_is_full_car else "isolated"
-    sim_label = "full_car" if sim_says_full_car else "isolated"
-    return f"CONFLICT: folder says {folder_label}, sim ISO_ prefix says {sim_label}"
+    sim_label = "full_car" if sim_is_full_car else "isolated"
+    return f"CONFLICT: folder says {folder_label}, filename says {sim_label}"

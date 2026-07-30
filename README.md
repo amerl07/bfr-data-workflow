@@ -5,17 +5,30 @@ watches a shared Google Drive folder for Sabalcore `post.zip` outputs,
 parses them into structured rows, and keeps a central, queryable record of
 sim results instead of scattered per-person spreadsheets.
 
-**Status:** the drive-watcher (Apps Script) is fully implemented and
-running -- it detects a new `post.zip` (or already-unzipped `post_` folder)
-and queues it in a Google Sheet, polling `processChanges()` every minute
-(see `ingestion/drive-watcher/README.md` for why push notifications were
-abandoned in favor of this). The queue consumer (Python) reads that queue,
-downloads/unzips each file, runs it through the parsers, and appends a row
-to `data/results.csv` -- also now running on a schedule rather than by
-hand, see "Automated ingestion" below. `ingestion/parsers/folder_name_parser.py`
-is still a stub (batch folders are out of current scope -- see
-`CONTRIBUTING.md`'s "Current scope" note), so rows involving a batch folder
-are left "blocked" in the queue rather than silently skipped or faked.
+**Status:** the full pipeline is implemented, running, and has been
+verified end-to-end on a real upload (2026-07-29) -- drop a `post.zip` in
+the watched Drive folder and a row shows up in `data/results.csv` with no
+manual steps. `ingestion/parsers/folder_name_parser.py` is still a stub
+(batch folders are out of current scope -- see `CONTRIBUTING.md`'s
+"Current scope" note), so rows involving a batch folder are left "blocked"
+in the queue rather than silently skipped or faked.
+
+## Tools & where things live
+
+Every stage of this pipeline runs on a different piece of infrastructure --
+worth knowing before debugging or handing this off:
+
+| Stage | Tool | Where it runs / is hosted |
+|---|---|---|
+| Watch the Drive folder | Google Apps Script (standalone project, `ingestion/drive-watcher/`) | Google's Apps Script runtime (script.google.com) -- not this repo's CI, not anyone's laptop |
+| Detect new uploads | Google Drive API v3 (`Drive.Changes.list`), polled by a 1-minute time-driven trigger | Same Apps Script project. Push notifications (`Drive.Changes.watch` + a web app `doPost`) are still wired up but not relied on -- they never fired reliably; see `ingestion/drive-watcher/README.md` |
+| Processing queue | A Google Sheet ("BFR Drive Watcher - Processing Queue", `Queue` tab) | Auto-created in Drive by the Apps Script project on first run; filed into the folder set as `GENERATED_SHEETS_FOLDER_ID` in `Config.gs`. Its ID is `QUEUE_SPREADSHEET_ID` in `ingestion/queue_consumer/main.py` |
+| Download, unzip, parse | Python (`ingestion/queue_consumer/`, `ingestion/parsers/`) | -- |
+| Run the consumer | GitHub Actions, scheduled every 10 minutes, also manually dispatchable (`.github/workflows/queue_consumer.yml`) | GitHub-hosted runner. Also runnable locally: `.venv/bin/python -m ingestion.queue_consumer.main` |
+| Auth for the consumer | A Google Cloud service account (GitHub Actions, headless) or the OAuth installed-app flow (local interactive runs) | Service account key lives in the `GCP_SERVICE_ACCOUNT_JSON` GitHub repo secret; OAuth client secret is `ingestion/queue_consumer/credentials.json` (gitignored, local only). See the "One-time setup" section at the top of `main.py` |
+| Result storage | `data/results.csv` | Committed to this GitHub repo -- the current source of truth, see "Where results live, and what's next" below |
+| Scene images (post.zip contents) | Left in / re-uploaded to Google Drive as individual files, never copied into this repo | `scene_image_refs` in `data/results.csv` stores Drive view links per image -- see `CONTRIBUTING.md` §4 |
+| Source code, version history, CI | This repository | GitHub |
 
 ## Repo layout
 

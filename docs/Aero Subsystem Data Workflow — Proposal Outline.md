@@ -99,20 +99,19 @@
 ## 5. Naming Convention
 
 ```
-{COMPONENT}_{VERSION}_{SWEEPTYPE}_{YYYYMMDD}_{INITIALS}
+{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}
 ```
 Applied at the **batch folder** level, not to individual files inside.
 
 **Examples:**
 ```
-RW_v3_VEL_20260709_YM/
-UT_v1_YAW_20260709_LC/
-FC_RWv3-UTv1-FWv2_VEL_20260709_YM/
+NC_UT_NoFillets_Cornering_20260724
+YL_WSK_VariableAoA_Straight_20260529
 ```
 
-**Component codes:** RW (rear wing), FW (front wing), UT (undertray), DIF (diffuser), SP (side pod), FC (full car — list mounted component versions hyphen-separated)
+**Component codes:** RW (rear wing), FW (front wing), UT (undertray), WSK (whisker), BW (Bodywork)
 
-**Sweep type codes:** VEL (velocity), YAW, RH (ride height), AOA (angle of attack), COMBO (multi-parameter)
+**Sweep type codes:** CORNER, STRAIGHT, VEL (velocity), YAW, RH (ride height), AOA (angle of attack), COMBO (multi-parameter)
 
 **Rules:**
 - Absence of `FC` implies isolated-component run.

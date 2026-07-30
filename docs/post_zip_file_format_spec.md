@@ -10,6 +10,32 @@
 
 Before the categories below — this covers the *outer* file names, not the contents of post.zip.
 
+**Decided 2026-07-29 — supersedes everything below in this section:** the
+originally-proposed two-layer scheme (a Drive batch-folder convention plus
+an independent Sabalcore `.sim`/`post.zip` convention with an `ISO_`
+prefix, described further down) has been replaced by a single naming layer,
+applied directly to the job name:
+
+```
+{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}
+```
+e.g. `NC_UT_NoFillets_Cornering_20260724`. See
+`docs/Aero Subsystem Data Workflow — Proposal Outline.md` §5 for the
+authoritative convention (component/sweep-type code lists, examples) and
+`CONTRIBUTING.md` §1 for the full parser-facing detail, including the rule
+that replaces the `ISO_` prefix (absence of `FC` as the `COMPONENT` token
+implies an isolated-component run). `ingestion/parsers/sim_filename_parser.py`
+implements this.
+
+**post.zip naming:** unchanged in shape --
+```
+post_<job name base>.zip
+```
+i.e. `post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip`.
+
+<details>
+<summary>Original proposal (superseded, kept for history)</summary>
+
 **Sabalcore `.sim` naming:**
 ```
 <INITIALS>_<descriptor>_<YYYYMMDD>.sim
@@ -23,6 +49,8 @@ Before the categories below — this covers the *outer* file names, not the cont
 post_<original .sim filename base>.zip
 ```
 i.e. `post_<INITIALS>_<descriptor>_<YYYYMMDD>.zip` (or `post_<INITIALS>_ISO_<descriptor>_<YYYYMMDD>.zip` for isolated runs). Matches the `post_<job_name>.zip` pattern already documented in the Sabalcore Usage Guide.
+
+</details>
 
 ---
 
@@ -115,15 +143,15 @@ Confirming the shape of what the parser produces, since this was still implicit.
 
 | Field | Source |
 |---|---|
-| `job_name` / `sim_file_base` | Sabalcore `.sim` filename base (§0) — `<INITIALS>_<descriptor>_<YYYYMMDD>`, or `<INITIALS>_ISO_<descriptor>_<YYYYMMDD>` |
+| `job_name` / `sim_file_base` | Job name base (§0) — `{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}` |
 | `post_zip_name` | `post_<job_name>.zip` |
-| `component` / `sim_type` | Parsed from descriptor / Drive batch folder name (Proposal Outline §5: RW, FW, UT, DIF, SP, FC) |
-| `sweep_type` | VEL / YAW / RH / AOA / COMBO, from folder name |
-| `isolated_vs_fullcar` | From `ISO_` prefix and/or absence of `FC` code — see the cross-check open question in §0 |
+| `component` / `sim_type` | `COMPONENT` token from the filename (§0; Proposal Outline §5: RW, FW, UT, WSK, BW, FC) |
+| `sweep_type` | `SWEEPTYPE` token from the filename (§0; Proposal Outline §5: CORNER, STRAIGHT, VEL, YAW, RH, AOA, COMBO) |
+| `isolated_vs_fullcar` | `full_car` iff `COMPONENT == "FC"`, `isolated` otherwise — single filename-level signal now, see §0 |
 | `date` | `YYYYMMDD` from filename |
 | `owner_initials` | From filename |
-| `raw_force_values`, `CoP`, `CoP_meters` | Parsed from `force_reports.txt` (category 5) — updated after a real sample arrived (docs/force_reports.txt): the file has no CL/CD coefficients, only raw forces in Newtons plus two CoP representations. See CONTRIBUTING.md §5/§6 for the full reasoning. |
-| `swept_variable`, `swept_range` | Confirmed **absent** from `force_reports.txt` (single-run export) — see CONTRIBUTING.md §6 |
+| `raw_force_values`, `body_df`/`rw_drag`/`fw_df`/`rw_df`/`total_drag`/`total_df`/`ut_df`/`cell_count`/`total_aero_df`/`wheel_df`/`whisker_df`, `CoP`, `CoP_meters` | Parsed from `force_reports.txt` (category 5) — updated after a real sample arrived (docs/force_reports.txt): the file has no CL/CD coefficients, only raw forces in Newtons plus two CoP representations. Each confirmed label also gets its own numeric column (decided 2026-07-29) alongside the catch-all `raw_force_values`. See CONTRIBUTING.md §4/§5 for the full reasoning. |
+| `swept_variable`, `swept_range` | Confirmed **absent** from `force_reports.txt` (single-run export) — see CONTRIBUTING.md §5 |
 | `scene_image_refs` | Pointers to the categorized images (categories 1–4) — see open question below on link vs. download |
 | `source_drive_folder` | Path/link to the originating batch folder, for traceability |
 

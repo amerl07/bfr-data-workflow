@@ -5,83 +5,76 @@ pipeline. Treat it as a pinned reference, not a one-time announcement --
 update it as new batches surface edge cases (per
 `docs/post_zip_file_format_spec.md`'s own framing).
 
-**Current scope:** the only thing currently dropped into Drive batch
-folders is a post job, named per the convention in §2 below -- either as
+**Current scope:** the only thing currently dropped into the watched Drive
+folder is a post job, named per the convention in §1 below -- either as
 `post_<job_name>.zip`, or as an already-unzipped `post_<job_name>` folder
 (same naming, minus `.zip`; supported so its images are already
-individually Drive-linkable with no extraction step -- see §4). No other
+individually Drive-linkable with no extraction step -- see §3). No other
 file types (raw CSVs, `.sim` files, stray images, etc.) are expected there
 yet, and the drive-watcher and `ingestion/parsers/` code are built to
 assume this -- they should not try to generically handle arbitrary file
 types ahead of need. Support for other artifact types -- e.g. a CSV-based
-Bayesian sweep trials log (see the open question in §6) -- is a known future
-extension, not something to build out now.
+Bayesian sweep trials log (see the open question in §5) -- is a known future
+extension, not something to build out now. Batch folders (grouping several
+post jobs together) are also out of scope right now -- `folder_name_parser.py`
+is still a stub -- so post.zip is normally dropped loose in the watched
+folder, not nested inside one.
 
-## 1. Drive batch-folder convention
+## 1. Source file naming convention
 
-Applied at the **batch-folder** level, not to individual files inside it.
-One folder per batch/session -- raw `post.zip` outputs are dropped in
-unmodified, original filenames preserved.
+Decided 2026-07-29 (`docs/Aero Subsystem Data Workflow — Proposal Outline.md`
+§5 is the authoritative source) -- **supersedes** the earlier two-layer
+scheme (an independent Drive batch-folder convention plus a Sabalcore
+`.sim`/`post.zip` convention with an `ISO_` prefix). There is now a single
+naming layer, applied to the job name itself:
 
 ```
-{COMPONENT}_{VERSION}_{SWEEPTYPE}_{YYYYMMDD}_{INITIALS}
+{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}
 ```
 
 **Examples:**
 ```
-RW_v3_VEL_20260709_YM/
-UT_v1_YAW_20260709_LC/
-FC_RWv3-UTv1-FWv2_VEL_20260709_YM/
+NC_UT_NoFillets_Cornering_20260724
+YL_WSK_VariableAoA_Straight_20260529
 ```
 
-**Component codes:** `RW` (rear wing), `FW` (front wing), `UT` (undertray),
-`DIF` (diffuser), `SP` (side pod), `FC` (full car -- lists mounted
-component versions hyphen-separated).
-
-**Sweep type codes:** `VEL` (velocity), `YAW`, `RH` (ride height), `AOA`
-(angle of attack), `COMBO` (multi-parameter).
-
-**Rules:**
-- Absence of `FC` implies an isolated-component run.
-- Version bumps on any meaningful geometry change, however small.
-- Initials are fixed per person, documented centrally (see §4 below).
-- Swept parameter ranges are *not* encoded in the folder name -- they're
-  pulled from `force_reports.txt` content instead, **if present** (see open
-  questions).
-
-## 2. Sabalcore `.sim` / `post.zip` filename convention
-
-A second, independent naming layer -- the *outer* filenames Sabalcore
-produces, underneath whatever Drive batch folder they end up in.
-
-**`.sim` job name:**
-```
-<INITIALS>_<descriptor>_<YYYYMMDD>.sim
-```
-Isolated-part runs prefix the descriptor with `ISO_`, e.g.
-`DY_ISO_RWv3_20260709.sim`.
-
-**`post.zip` name:** wraps the `.sim` base --
+**`.sim` / `post.zip` names:** the job name above is the `.sim` file's base
+name; `post.zip` wraps it --
 ```
 post_<job_name>.zip
 ```
-i.e. `post_<INITIALS>_<descriptor>_<YYYYMMDD>.zip` (or with `ISO_` in the
-descriptor for isolated runs).
+i.e. `post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip`.
 
-**FC vs. `ISO_` cross-check (decided):** the Drive folder convention (§1)
-encodes isolated-vs-fullcar via absence of the `FC` component code; the
-Sabalcore `ISO_` prefix is a second, independent signal for the same
-distinction, at a different naming layer. Decision: cross-check both when
-both are available (post.zip is inside a batch folder), and surface a
-disagreement rather than silently picking one -- the `isolated_vs_fullcar`
-column becomes a literal `CONFLICT: folder says ..., sim ISO_ prefix says
-...` string in that case, visible directly in `data/results.csv`. When
-there's no batch folder at all (the common case now -- see "Current scope"
-above), the `ISO_`/sim signal is used alone since there's nothing to
-cross-check against. See
-`ingestion/parsers/sim_filename_parser.py::reconcile_isolated_vs_fullcar`.
+**Component codes:** `RW` (rear wing), `FW` (front wing), `UT` (undertray),
+`WSK` (whisker), `BW` (bodywork), `FC` (full car).
 
-## 3. post.zip file categories (summary)
+**Sweep type codes:** `CORNER`, `STRAIGHT`, `VEL` (velocity), `YAW`,
+`RH` (ride height), `AOA` (angle of attack), `COMBO` (multi-parameter).
+
+Neither code list is validated by the parser (`ingestion/parsers/sim_filename_parser.py`)
+-- an unrecognized code still parses fine, it's just not one of the above.
+This matches the same "parse whatever's possible, don't invent/reject"
+approach used for force report labels (§4).
+
+**Rules:**
+- Each of the five fields is a single token -- no underscores within a
+  field (`NoFillets`, not `No_Fillets`) -- since the parser splits on `_`
+  and expects exactly five parts plus the date. A filename that doesn't fit
+  this shape fails to parse and the row is marked `error: ...` in the queue
+  rather than guessed at.
+- Absence of `FC` as the `COMPONENT` token implies an isolated-component
+  run -- this is now the **only** isolated-vs-fullcar signal (`isolated_vs_fullcar`
+  in `data/results.csv` is `full_car` iff `COMPONENT == "FC"`). There's no
+  separate `ISO_` prefix anymore. `reconcile_isolated_vs_fullcar` still
+  accepts a second, Drive-batch-folder-derived signal for cross-checking
+  (producing a `CONFLICT: ...` string on disagreement) but that signal is
+  normally unavailable now that batch folders are out of scope -- see
+  `ingestion/parsers/sim_filename_parser.py::reconcile_isolated_vs_fullcar`.
+- Initials are fixed per person, documented centrally (see §6 below).
+- Swept parameter ranges are *not* encoded in the name -- pulled from
+  `force_reports.txt` content instead, **if present** (see open questions).
+
+## 2. post.zip file categories (summary)
 
 Full detail, including per-category naming patterns and every open
 question, lives in `docs/post_zip_file_format_spec.md` -- read that before
@@ -108,11 +101,11 @@ touching `ingestion/parsers/post_zip_classifier.py`. Quick summary:
 5. **Force report** (`force_reports.txt`) -- the one file that gets parsed
    into structured rows. Format confirmed against a real sample: raw force
    values (Newtons) and two CoP representations, not CL/CD coefficients,
-   and no swept-variable/range. See §5/§6 below for the full detail.
+   and no swept-variable/range. See §4/§5 below for the full detail.
 6. **Unclassified/other** -- catch-all for anything not matching 1-5; must
    be logged with filename + batch folder name rather than silently dropped.
 
-## 4. Image handling: link vs. download (decision record)
+## 3. Image handling: link vs. download (decision record)
 
 **Decision:** default to **link-only**. `data/results.csv` stores a Drive
 file ID / shareable link per image (`scene_image_refs`), not a downloaded
@@ -147,28 +140,29 @@ only -- not the force report, not the unclassified bucket), using
 `post_zip_classifier.py`'s now-decided per-image dict shape (each entry has
 a `file_name` key).
 
-## 5. `data/results.csv` schema
+## 4. `data/results.csv` schema
 
 One row per `post.zip` processed. See
 `docs/post_zip_file_format_spec.md` §7 for full detail.
 
 | Column | Source |
 |---|---|
-| `job_name` | Sabalcore `.sim` filename base (§2) |
+| `job_name` | Job name base, `{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}` (§1) |
 | `post_zip_name` | `post_<job_name>.zip` |
-| `component` | Drive folder name / descriptor (§1) |
-| `sweep_type` | Drive folder name (§1) |
-| `isolated_vs_fullcar` | `full_car` / `isolated` / `CONFLICT: ...` -- `FC` absence and/or `ISO_` prefix, cross-checked (§2) |
+| `component` | `COMPONENT` token from the filename (§1) |
+| `sweep_type` | `SWEEPTYPE` token from the filename (§1) |
+| `isolated_vs_fullcar` | `full_car` iff `COMPONENT == "FC"`, `isolated` otherwise, or `CONFLICT: ...` if a Drive-folder signal disagrees (§1) |
 | `date` | `YYYYMMDD` from filename |
-| `owner_initials` | From filename |
-| `raw_force_values` | `;`-joined `label=value unit` pairs, everything `force_reports.txt` has (§3.5) -- no CL/CD column; computing a real coefficient needs reference constants not in the file, and getting those out of the sims is hard for this team right now, so raw forces are stored instead. Values are exactly as the file reports them, including its own "half-car, undoubled" convention -- not doubled to a full-car representation. |
-| `CoP` | `force_reports.txt`'s unitless `CoP` label -- a percentage (§3.5) |
-| `CoP_meters` | `force_reports.txt`'s separate `CoP meters` label -- absolute distance in meters (§3.5); kept alongside `CoP` rather than picking one |
+| `owner_initials` | `INITIALS` token from the filename (§1) |
+| `raw_force_values` | `;`-joined `label=value unit` pairs, **everything** `force_reports.txt` has (§2.5), regardless of whether a label also got its own column below -- no data is ever only in the structured columns. |
+| `body_df`, `rw_drag`, `fw_df`, `rw_df`, `total_drag`, `total_df`, `ut_df`, `cell_count`, `total_aero_df`, `wheel_df`, `whisker_df` | Decided 2026-07-29: each force label confirmed present in every real `force_reports.txt` sample so far gets its own numeric column too (`ingestion/queue_consumer/main.py::FORCE_LABEL_COLUMNS`), for querying/sorting without re-parsing `raw_force_values`. A label not in this fixed set (a future/different export shape) stays in `raw_force_values` only -- no column gets invented for it. A known label simply absent from one report (e.g. an isolated run with no `FW DF` line) leaves its column blank, not an error. No CL/CD column -- computing a real coefficient needs reference constants (velocity, area, air density) not present in the file, and getting those out of the sims is hard for this team right now. Values are exactly as the file reports them, including its own "half-car, undoubled" convention -- not doubled to a full-car representation. |
+| `CoP` | `force_reports.txt`'s unitless `CoP` label -- a percentage (§2.5) |
+| `CoP_meters` | `force_reports.txt`'s separate `CoP meters` label -- absolute distance in meters (§2.5); kept alongside `CoP` rather than picking one |
 | `swept_variable`, `swept_range` | **Confirmed absent** from `force_reports.txt` (a single-run export has no sweep info at all) -- would need to come from elsewhere, e.g. the sweep tool's own trials log (Proposal Outline §4.3), if captured at all |
-| `scene_image_refs` | `;`-joined Drive view links, one per scene image (§4) |
-| `source_drive_folder` | Path/link to the originating batch folder |
+| `scene_image_refs` | `;`-joined Drive view links, one per scene image (§3) |
+| `source_drive_folder` | Path/link to the originating batch folder, blank when the post.zip was dropped loose (no batch folder) |
 
-## 6. Open questions (consolidated)
+## 5. Open questions (consolidated)
 
 Pulled from `docs/` into one place so they're easy to track:
 
@@ -183,12 +177,20 @@ Pulled from `docs/` into one place so they're easy to track:
       now.** `force_reports.txt` only has raw forces in Newtons, not
       coefficients, and getting the reference constants (velocity, area,
       air density) needed to compute one out of the sims is hard for this
-      team right now -- `data/results.csv` stores `raw_force_values`
-      instead. Revisit if those constants become available.
+      team right now -- `data/results.csv` stores `raw_force_values` plus a
+      column per known force label instead. Revisit if those constants
+      become available.
 - [x] ~~`force_reports.txt` "half-car, undoubled" values -- double or
       not?~~ **Decided: leave as-is, no doubling, for now.**
 - [x] ~~`CoP` vs. `CoP meters` -- which one?~~ **Decided: keep both.**
       `CoP` is the percentage, `CoP_meters` is the absolute distance.
+- [x] ~~FC vs. `ISO_` cross-check.~~ **Superseded, not just decided:** the
+      independent Sabalcore `ISO_` prefix no longer exists -- the new
+      unified naming convention (§1) encodes isolated-vs-fullcar via the
+      same `COMPONENT` token used for `component`, so there's only one
+      filename-level signal now, not two to cross-check. A Drive-folder
+      signal can still be cross-checked against it if that ever comes back
+      into scope.
 - [ ] `x_`/`y_` slice filename sign convention -- double-underscore means
       negative or zero/positive? Contradicted in the one sample batch.
       (spec §1)
@@ -218,9 +220,9 @@ Pulled from `docs/` into one place so they're easy to track:
 - [ ] Retention policy for `.sim` files (who hosts them, for how long).
       (Proposal Outline §6)
 
-## 7. Owner-initials registry
+## 6. Owner-initials registry
 
-Initials are fixed per person and used in both naming conventions above.
+Initials are fixed per person and used in the naming convention above.
 Keep this table current.
 
 | Initials | Name |

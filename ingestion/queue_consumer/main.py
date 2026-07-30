@@ -91,6 +91,29 @@ CREDENTIALS_PATH = _MODULE_DIR / "credentials.json"
 TOKEN_PATH = _MODULE_DIR / "token.json"
 SERVICE_ACCOUNT_PATH = _MODULE_DIR / "service-account.json"
 
+# Force labels confirmed present in every real force_reports.txt sample so
+# far (docs/force_reports.txt, plus every real upload processed since) --
+# each gets its own results.csv column alongside the catch-all
+# raw_force_values, for querying/sorting without re-parsing that string. A
+# label from some future/different export shape that ISN'T in this map is
+# never lost -- it just stays in raw_force_values only, not promoted to a
+# column (per 2026-07-29 decision: don't invent columns for undefined
+# labels). A known label simply absent from one report (e.g. an isolated
+# run with no "FW DF" line) leaves its column blank, not an error.
+FORCE_LABEL_COLUMNS = {
+    "Body DF": "body_df",
+    "RW Drag": "rw_drag",
+    "FW DF": "fw_df",
+    "RW DF": "rw_df",
+    "Total Drag": "total_drag",
+    "Total DF": "total_df",
+    "UT DF": "ut_df",
+    "Cell count": "cell_count",
+    "Total Aero DF": "total_aero_df",
+    "Wheel DF": "wheel_df",
+    "Whisker DF": "whisker_df",
+}
+
 RESULTS_CSV_PATH = _MODULE_DIR.parent.parent / "data" / "results.csv"
 RESULTS_FIELDS = [
     "job_name",
@@ -104,8 +127,10 @@ RESULTS_FIELDS = [
     # (no reference velocity/area/air-density to compute one from), and
     # getting those params out of the sims is hard for this team right now
     # -- see force_reports_parser.py's docstring. raw_force_values stores
-    # everything force_reports.txt has instead.
+    # everything force_reports.txt has, verbatim, regardless of whether a
+    # label made it into its own column below.
     "raw_force_values",
+    *FORCE_LABEL_COLUMNS.values(),
     "CoP",
     "CoP_meters",
     "swept_variable",
@@ -373,14 +398,22 @@ def build_result_row(
 
     isolated_vs_fullcar = sim_filename_parser.reconcile_isolated_vs_fullcar(
         folder_metadata.is_full_car if folder_metadata else None,
-        sim_metadata.is_isolated,
+        sim_metadata.is_full_car,
     )
 
-    return {
+    row = {
         "job_name": sim_metadata.job_name,
         "post_zip_name": file_name,
-        "component": folder_metadata.component if folder_metadata else "",
-        "sweep_type": folder_metadata.sweep_type if folder_metadata else "",
+        # Filename-derived ({INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}
+        # _{YYYYMMDD}, Proposal Outline §5), not folder_metadata --
+        # component/sweep_type now come from the post.zip name itself,
+        # since a batch folder (the only other source) is out of current
+        # scope and folder_name_parser is still a stub. If folder_metadata
+        # is ever populated again, cross-checking it against these would
+        # belong here, same spirit as isolated_vs_fullcar's reconciliation
+        # above -- not done yet.
+        "component": sim_metadata.component,
+        "sweep_type": sim_metadata.sweep_type,
         "isolated_vs_fullcar": isolated_vs_fullcar,
         "date": sim_metadata.date,
         "owner_initials": sim_metadata.owner_initials,
@@ -392,6 +425,9 @@ def build_result_row(
         "scene_image_refs": format_scene_image_refs(classification, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
     }
+    for label, column in FORCE_LABEL_COLUMNS.items():
+        row[column] = force_data.raw_values.get(label)
+    return row
 
 
 def format_raw_force_values(raw_values, units):

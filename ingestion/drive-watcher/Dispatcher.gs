@@ -24,6 +24,19 @@ var QUEUE_HEADERS = ['detected_at', 'file_id', 'file_name', 'batch_folder_id', '
  */
 function handOffNewFile(file) {
   var sheet = getOrCreateQueueSheet();
+
+  if (isAlreadyQueued(sheet, file.id)) {
+    // Confirmed happening in practice (2026-07-29): the same file_id
+    // showed up in two separate Drive.Changes.list responses about 6
+    // minutes apart, most likely a metadata-only touch (e.g. a permission
+    // grant propagating) re-emitting a change event for a file whose
+    // content didn't actually change. Without this check, every such
+    // event became its own queue row and the Python consumer would
+    // re-download/re-extract/re-upload the same job more than once.
+    Logger.log('Skipping %s (%s) -- already has a queue row.', file.name, file.id);
+    return;
+  }
+
   var parentId = (file.parents || [])[0] || '';
   var hasBatchFolder = parentId && parentId !== WATCHED_FOLDER_ID;
   var batchFolderId = hasBatchFolder ? parentId : '';
@@ -38,6 +51,25 @@ function handOffNewFile(file) {
   sheet.appendRow([timestamp, file.id, file.name, batchFolderId, batchFolderName, 'pending']);
 
   Logger.log('Queued %s for processing (batch folder: %s).', file.name, batchFolderName || '(none)');
+}
+
+/**
+ * True if `fileId` already has a row in the queue, regardless of its
+ * status -- checked by file_id (column B) so an already-queued file is
+ * skipped whether it's still "pending" or already "processing"/"done"/
+ * "blocked"/"error" from a previous detection of the same file.
+ * @param {Sheet} sheet
+ * @param {string} fileId
+ */
+function isAlreadyQueued(sheet, fileId) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    return false;
+  }
+  var fileIds = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+  return fileIds.some(function (row) {
+    return row[0] === fileId;
+  });
 }
 
 /**
