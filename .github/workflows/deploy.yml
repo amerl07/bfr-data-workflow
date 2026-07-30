@@ -34,7 +34,7 @@ jobs:
           cache: "npm"
           cache-dependency-path: web/package-lock.json
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
 
       - name: Install dependencies
         working-directory: web
@@ -52,7 +52,7 @@ jobs:
           # project-pages path; unset for local dev/build.
           GITHUB_PAGES: "true"
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: web/out
 
@@ -64,4 +64,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
