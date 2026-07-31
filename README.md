@@ -125,6 +125,9 @@ query needs outgrow what's comfortable against a flat file.
 
 ## Docs
 
+- [`docs/Team Usage Guide.md`](<docs/Team Usage Guide.md>) — start here if
+  you're a team member submitting runs, not building the pipeline: the
+  end-to-end workflow, naming convention, and how to use the web app.
 - [`docs/Aero Subsystem Data Workflow — Proposal Outline.md`](<docs/Aero Subsystem Data Workflow — Proposal Outline.md>)
   — problem statement, goals, proposed workflow, and open questions.
 - [`docs/BFR Sabalcore HPC — Usage Guide.md`](<docs/BFR Sabalcore HPC — Usage Guide.md>)
