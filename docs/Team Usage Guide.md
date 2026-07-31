@@ -1,17 +1,23 @@
 # BFR Aero Data Workflow — Team Guide
+Last updated: July 30, 2026 - Yumo Liu
 
 This is the short version: how to get your sim results into the shared
-database and how to find them again. For the full technical reference see
+database and how to find them again. For full technical reference see
 https://github.com/amerl07/bfr-data-workflow.
+
+# Quick Links
+**Drop-off Folder**: https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
+**Process Queue Sheet**: https://docs.google.com/spreadsheets/d/1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ/edit 
+**Web Database**: https://amerl07.github.io/bfr-data-workflow/ 
 
 ## 1. Workflow
 
 1. **Run your sim** on Sabalcore as usual. See https://docs.google.com/document/d/1hN6mHg-wJhHBhw11GJ4ZimBdNPMyy06pYu70YtxgMXE/edit?usp=sharing
 2. **Name the job** using the naming convention below (see §2) — this
-   matters *before* you export, since the job name is baked into the
+   matters since the job name is baked into the
    `post.zip` filename and that's how everything downstream (component,
    sweep type, owner, date) gets parsed out automatically. There's no way
-   to fix it afterwards except re-uploading with the right name.
+   to fix it afterwards except uploading again with the right name.
 3. **Drop `post_<job_name>.zip`** into the shared watched Drive folder:
    https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
    You can drop it loose in that folder — no need to create a subfolder.
@@ -107,4 +113,4 @@ anything for a new `done` run to show up, just reload the page.
 
 ## 5. Questions, bugs, suggestions
 
-Direct all of it to **Yumo Liu** (liuyumo@berkeley.edu). If something looks wrong (a stuck queue row, a bad parse, a confusing bit of the web app) or you have an idea for what'd make this more useful let me know.
+Direct all questions **Yumo Liu** (liuyumo@berkeley.edu). If something looks wrong (a stuck queue row, a bad parse, a confusing bit of the web app) or you have an idea for what'd make this more useful let me know.
