@@ -162,9 +162,18 @@ One row per `post.zip` processed. See
 | `scene_image_refs` | `;`-joined Drive view links, one per scene image (§3) |
 | `source_drive_folder` | Path/link to the originating batch folder, blank when the post.zip was dropped loose (no batch folder) |
 
-## 5. Open questions (consolidated)
 
-Pulled from `docs/` into one place so they're easy to track:
+## 5. Owner-initials registry
+
+Initials are fixed per person and used in the naming convention above.
+Existing initials are: 
+- YL
+- MT
+- DY
+- NC
+- AV
+
+## 6. Open questions (consolidated)
 
 - [ ] **GitHub Actions `schedule:` trigger for `queue_consumer.yml` is
       unreliable.** Found 2026-07-29: observed runs 1.5-3 hours apart
@@ -231,13 +240,3 @@ Pulled from `docs/` into one place so they're easy to track:
       (Proposal Outline §6)
 - [ ] Retention policy for `.sim` files (who hosts them, for how long).
       (Proposal Outline §6)
-
-## 6. Owner-initials registry
-
-Initials are fixed per person and used in the naming convention above.
-Keep this table current.
-
-| Initials | Name |
-|---|---|
-| YM | Yumo |
-| | |
