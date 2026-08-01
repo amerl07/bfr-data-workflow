@@ -50,7 +50,7 @@ post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip
 **Examples:**
 ```
 post_NC_UT_NoFillets_Cornering_20260724.zip
-post_YL_WSK_VariableAoA_Straight_20260529.zip
+post_YL_WSK_VariableAoA_Straightline_20260529.zip
 ```
 
 **Rules of thumb:**
@@ -64,7 +64,7 @@ post_YL_WSK_VariableAoA_Straight_20260529.zip
   - Note: If you are designing parts of or attachments to another device, use the component code of the main device. Eg. Use RW for endplates, FW for footplates, 
 - **Description** — free text, your call, just NO UNDERSCORES or SPACES
   (e.g. `NoFillets`, `Outwash`, `Baseline`).
-- **Sweep type** — one of: `CORNER`, `STRAIGHT`
+- **Sweep type** — one of: `CORNERING`, `STRAIGHTLINE`
   - NOT yet implemented: `VEL` (velocity), `YAW`, `RH` (ride height), `AOA` (angle of attack), `COMBO` (multi-parameter). Per the "Component" bullet, use FC component code instead.
 - **Date** — `YYYYMMDD`.
 - Unrecognized component/sweep-type codes won't break anything — they'll
