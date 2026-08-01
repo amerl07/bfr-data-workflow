@@ -1,2 +1,1 @@
 job_name,post_zip_name,component,sweep_type,isolated_vs_fullcar,date,owner_initials,raw_force_values,body_df,rw_drag,fw_df,rw_df,total_drag,total_df,ut_df,cell_count,total_aero_df,wheel_df,whisker_df,CoP,CoP_meters,swept_variable,swept_range,scene_image_refs,source_drive_folder
-DY_RW_newMainplaneGurney_straightline_20260731,post_DY_RW_newMainplaneGurney_straightline_20260731.zip,RW,straightline,isolated,20260731,DY,CoP=58.769417;Cell Count=37746121.0,,,,,,,,,,,,58.769417,,,,https://drive.google.com/file/d/12Jdqjymy-0n_XzWWhtJm7yCCUfkSj0rc/view,

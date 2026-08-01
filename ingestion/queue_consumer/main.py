@@ -9,9 +9,9 @@ case, or just listing children for the folder case, so that either way every
 scene image ends up with a real Drive file id (see CONTRIBUTING.md §4's
 "link only" gap). That part runs regardless of parser status.
 
-What still doesn't fully run: sim_filename_parser and post_zip_classifier
-are implemented; force_reports_parser now parses the real (confirmed)
-format too, but deliberately doesn't populate CL/CD (no reference constants
+What still doesn't fully run: sim_filename_parser is implemented;
+force_reports_parser now parses the real (confirmed) format too, but
+deliberately doesn't populate CL/CD (no reference constants
 to compute a coefficient from raw Newtons -- see its docstring) or
 swept_variable/swept_range (confirmed absent from the format). Blocked past
 that point on reconcile_isolated_vs_fullcar and, when a batch folder is
@@ -61,7 +61,6 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from ingestion.parsers import (
     folder_name_parser,
     force_reports_parser,
-    post_zip_classifier,
     sim_filename_parser,
 )
 
@@ -391,9 +390,6 @@ def build_result_row(
     if batch_folder_name:
         folder_metadata = folder_name_parser.parse_batch_folder_name(batch_folder_name)
 
-    classification = post_zip_classifier.classify_post_zip_contents(
-        file_names, batch_folder_name
-    )
     force_data = force_reports_parser.parse_force_report(force_report_text)
 
     isolated_vs_fullcar = sim_filename_parser.reconcile_isolated_vs_fullcar(
@@ -422,11 +418,18 @@ def build_result_row(
         "CoP_meters": force_data.CoP_meters,
         "swept_variable": force_data.swept_variable,
         "swept_range": force_data.swept_range,
-        "scene_image_refs": format_scene_image_refs(classification, filename_to_drive_id),
+        "scene_image_refs": format_scene_image_refs(file_names, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
     }
+    # normalize_label so this matches regardless of which confirmed label
+    # spelling the source file used (underscore vs space, case) -- see
+    # force_reports_parser.py's module docstring, 2026-08-01 finding.
+    normalized_raw_values = {
+        force_reports_parser.normalize_label(label): value
+        for label, value in force_data.raw_values.items()
+    }
     for label, column in FORCE_LABEL_COLUMNS.items():
-        row[column] = force_data.raw_values.get(label)
+        row[column] = normalized_raw_values.get(force_reports_parser.normalize_label(label))
     return row
 
 
@@ -446,30 +449,31 @@ def format_raw_force_values(raw_values, units):
     return ";".join(parts)
 
 
-def format_scene_image_refs(classification, filename_to_drive_id):
-    """Builds Drive links for every scene image in classification's
-    categories 1-4 (velocity slices, WSS, CP, setup scenes -- per spec §7,
-    not the force report and not the unclassified bucket), using
-    filename_to_drive_id (built by materialize_post_contents, which gives
+def format_scene_image_refs(file_names, filename_to_drive_id):
+    """Builds Drive links for every scene image in the post job -- every
+    file except force_reports.txt, listed unfiltered rather than matched
+    against per-category filename patterns. DECIDED 2026-08-01: every real
+    batch seen so far has a different image count and naming scheme (see
+    docs/post_zip_file_format_spec.md's top-of-file note), so classifying
+    by filename pattern (the old post_zip_classifier.py approach) silently
+    dropped files that didn't match a known shape. Listing everything
+    except the force report is the only rule that holds across batches.
+
+    filename_to_drive_id is built by materialize_post_contents, which gives
     every scene image a real Drive file id regardless of whether the post
     job arrived as an already-unzipped Drive folder or a zip that got
-    extracted and re-uploaded -- see CONTRIBUTING.md §4).
+    extracted and re-uploaded -- see CONTRIBUTING.md §3.
 
     A filename missing from filename_to_drive_id (shouldn't normally
-    happen -- classification and filename_to_drive_id are built from the
-    same file listing) is recorded as "MISSING:<name>" rather than silently
-    dropped, so a mismatch is visible in data/results.csv instead of just
-    producing a shorter-than-expected list.
+    happen -- both come from the same file listing) is recorded as
+    "MISSING:<name>" rather than silently dropped, so a mismatch is visible
+    in data/results.csv instead of just producing a shorter-than-expected
+    list.
     """
-    scene_filenames = (
-        [entry["file_name"] for entry in classification.velocity_slices]
-        + [entry["file_name"] for entry in classification.wall_shear_stress]
-        + [entry["file_name"] for entry in classification.pressure_coefficient]
-        + classification.setup_scenes
-    )
-
     links = []
-    for name in scene_filenames:
+    for name in file_names:
+        if name == "force_reports.txt":
+            continue
         file_id = filename_to_drive_id.get(name)
         links.append(f"https://drive.google.com/file/d/{file_id}/view" if file_id else f"MISSING:{name}")
 

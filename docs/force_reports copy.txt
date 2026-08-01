@@ -1,0 +1,20 @@
+# BFR report export   run: DY_RW_newMainplaneGurney_straightline_20260731_0600
+# raw report values (half-car, undoubled) per BFR_CFD_Standards
+# DF sign convention: downforce reads negative
+
+FW_DF                                               -132.662185  N
+RW_DF                                               -178.278185  N
+UT_DF                                                -93.563664  N
+Total_DF                                            -409.591108  N
+Total_Aero_DF                                       -416.486184  N
+Total_Drag                                           187.465275  N
+CoP_Meters                                             0.925618  m
+Body_DF                                              -20.843421  N
+CoP                                                   58.769417  
+Whisker_DF                                             8.798955  N
+Wheel_DF                                               6.895076  N
+Radiator_MFR                                           0.270510  kg/s
+Inlet_MFA                                             70.430064  Pa
+Outlet_MFA                                            39.612067  Pa
+Pressure_Drop                                         30.817996  
+Cell Count                                      37746121.000000  

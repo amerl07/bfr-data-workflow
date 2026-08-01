@@ -6,6 +6,22 @@
 
 ---
 
+**Decided 2026-08-01 — images are no longer classified by filename pattern:**
+Sections 1–4 below (velocity slices, WSS, CP, setup scenes) document real
+naming patterns observed across batches, and are kept as naming reference,
+but the parser (`ingestion/queue_consumer/main.py::format_scene_image_refs`)
+no longer matches image filenames against them. Confirmed across batches:
+every sim's post.zip has a different number of images and different names,
+so a fixed set of per-category regexes was guaranteed to keep missing
+files (silently landing in the old "unclassified" bucket, category 6,
+rather than in `scene_image_refs`). **Now:** every file in the post job
+except `force_reports.txt` is listed in `scene_image_refs`, unfiltered —
+see §7. `ingestion/parsers/post_zip_classifier.py` (the old per-category
+matcher) has been removed; see git history if the old regex patterns are
+ever needed again.
+
+---
+
 ## 0. Source File Naming (Sabalcore .sim / post.zip)
 
 Before the categories below — this covers the *outer* file names, not the contents of post.zip.
@@ -93,7 +109,7 @@ All 2×2×2 = 8 combinations present in this batch.
 `WSS_Right`, `WSS_Left`, `WSS_Front`) — mirroring the overview/quadrant
 split already documented for `CP_` below. Not present in this section's
 original 76-file batch. This category is variable-count, not fixed, like
-§1 and §3 — see `ingestion/parsers/post_zip_classifier.py`.
+§1 and §3.
 
 ---
 
@@ -133,7 +149,13 @@ Fixed, non-parametric reference images — not expected to vary in count batch-t
 
 ## 6. Others / Unidentified
 
-Nothing in this batch fell outside categories 1–5, aside from the two ambiguous items flagged above (`CpT_Sweep.png`'s odd-one-out naming, and the ambiguous `_` sign convention in category 1). This section exists as a catch-all for future batches — **anything encountered that doesn't cleanly fit categories 1–5 should be logged here with the batch it came from**, rather than force-fit into an existing category, so the parser's "unknown file" bucket has a paper trail instead of silently dropping files.
+**No longer meaningful as of the 2026-08-01 decision above** — there's no
+"doesn't fit a category" bucket anymore since nothing is matched against
+categories 1–5 for `scene_image_refs` purposes; every non-force-report file
+is included. Left here for history: nothing in the original 76-file batch
+fell outside categories 1–5, aside from the two ambiguous items flagged
+above (`CpT_Sweep.png`'s odd-one-out naming, and the ambiguous `_` sign
+convention in category 1).
 
 ---
 
@@ -152,7 +174,7 @@ Confirming the shape of what the parser produces, since this was still implicit.
 | `owner_initials` | From filename |
 | `raw_force_values`, `body_df`/`rw_drag`/`fw_df`/`rw_df`/`total_drag`/`total_df`/`ut_df`/`cell_count`/`total_aero_df`/`wheel_df`/`whisker_df`, `CoP`, `CoP_meters` | Parsed from `force_reports.txt` (category 5) — updated after a real sample arrived (docs/force_reports.txt): the file has no CL/CD coefficients, only raw forces in Newtons plus two CoP representations. Each confirmed label also gets its own numeric column (decided 2026-07-29) alongside the catch-all `raw_force_values`. See CONTRIBUTING.md §4/§5 for the full reasoning. |
 | `swept_variable`, `swept_range` | Confirmed **absent** from `force_reports.txt` (single-run export) — see CONTRIBUTING.md §5 |
-| `scene_image_refs` | Pointers to the categorized images (categories 1–4) — see open question below on link vs. download |
+| `scene_image_refs` | Pointers to every file in the post job except `force_reports.txt`, unfiltered (decided 2026-08-01, see top of this doc — no longer matched against categories 1–4) — see open question below on link vs. download |
 | `source_drive_folder` | Path/link to the originating batch folder, for traceability |
 
 This is a first pass — exact column names/order aren't locked, just the shape.
@@ -170,8 +192,15 @@ Leaning toward "link only" as the simpler v1, with downloading as a fallback if 
 
 ## Notes for parser design
 
-- Treat categories 1–3 (velocity slices, WSS, CP) as **variable-count, variable-parameter** — don't hardcode the exact slice values/quadrants seen in this one batch.
-- Categories 4–5 (setup scenes, force report) are expected to be **fixed-count, always present**.
-- Any file not matching a known pattern should route to an "unclassified" bucket (category 6) and get logged with filename + batch folder name, rather than causing a silent skip or a parser failure.
+- **Images (categories 1–4) are not matched against filename patterns by the
+  parser** — see the 2026-08-01 decision at the top of this doc. The
+  variable-count/variable-parameter framing below is kept as naming
+  reference, not as something `format_scene_image_refs` implements.
+- Categories 1–3 (velocity slices, WSS, CP) are **variable-count,
+  variable-parameter** — don't hardcode the exact slice values/quadrants
+  seen in this one batch.
+- Categories 4–5 (setup scenes, force report) are expected to be
+  **fixed-count, always present** — force_reports.txt (category 5) is still
+  the one file excluded from `scene_image_refs` by name.
 - Before finalizing the sign/zero-value naming rule for X/Y slices, confirm directly against the export macro rather than reverse-engineering from filenames — the one batch we have contains a contradiction (see §1).
 - The parser that maps a Drive batch folder to its source Sabalcore job should be aware of both naming layers (§0) — the folder name convention and the underlying `.sim`/`post.zip` name won't necessarily agree on how "isolated" is flagged (`FC` absence vs. `ISO_` prefix). Decide whether to cross-validate or pick one as authoritative before building this mapping.

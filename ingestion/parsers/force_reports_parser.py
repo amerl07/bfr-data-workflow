@@ -1,7 +1,9 @@
 """Parses force_reports.txt, the primary numeric artifact in a post.zip.
 
-Format confirmed against one real sample (docs/force_reports.txt, run
-"NC_B27_UT_Cornering_No_Fillets_20260724"):
+Format confirmed against two real samples: docs/force_reports.txt (run
+"NC_B27_UT_Cornering_No_Fillets_20260724") and
+docs/"force_reports copy.txt" (run
+"DY_RW_newMainplaneGurney_straightline_20260731"):
 
     # <arbitrary header comment lines, '#'-prefixed>
     <Label>          <value>          <unit-or-blank>
@@ -44,6 +46,22 @@ guessed, but this is still a single sample:
   returns whatever the file says, unmodified, plus the header note itself
   (header_notes) so the caveat travels with the data rather than getting
   lost.
+
+New finding from the second sample (2026-08-01), which broke both the line
+regex and every label lookup until fixed:
+- That export spells every label with underscores instead of spaces
+  ("Body_DF" vs "Body DF", "CoP_Meters" vs "CoP meters" -- note the
+  differing capitalization too), and adds four labels never seen before
+  ("Radiator_MFR", "Inlet_MFA", "Outlet_MFA", "Pressure_Drop" -- cooling/
+  pressure figures, not forces). DECIDED: `_VALUE_LINE_PATTERN` now accepts
+  underscores (and `/` in the unit, for "kg/s"), and every label lookup
+  (CoP/CoP_meters here, FORCE_LABEL_COLUMNS in
+  ingestion/queue_consumer/main.py) goes through `normalize_label` so both
+  spellings resolve to the same field/column. `raw_values`/`raw_force_values`
+  still key on the label exactly as written in the file -- only lookups are
+  normalized, not storage. The four new labels have no dedicated column
+  (per the 2026-07-29 "don't invent columns for undefined labels" decision
+  above) -- they stay in raw_force_values only.
 """
 
 import re
@@ -77,8 +95,16 @@ _HEADER_RUN_PATTERN = re.compile(r"run:\s*(?P<run_name>\S+)")
 # observed so far only ever have single internal spaces ("Body DF", "Total
 # Aero DF"), so this correctly keeps multi-word labels intact.
 _VALUE_LINE_PATTERN = re.compile(
-    r"^(?P<label>[A-Za-z][A-Za-z0-9 ]*?)\s{2,}(?P<value>-?\d+\.\d+)\s*(?P<unit>[A-Za-z]*)\s*$"
+    r"^(?P<label>[A-Za-z][A-Za-z0-9_ ]*?)\s{2,}(?P<value>-?\d+\.\d+)\s*(?P<unit>[A-Za-z/]*)\s*$"
 )
+
+
+def normalize_label(label: str) -> str:
+    """Case/underscore/whitespace-insensitive form of a force_reports.txt
+    label, so the same field matches regardless of which confirmed label
+    spelling a given export uses (e.g. "Body DF" vs "Body_DF", "CoP meters"
+    vs "CoP_Meters") -- see the module docstring's 2026-08-01 finding."""
+    return " ".join(label.replace("_", " ").split()).lower()
 
 
 def parse_force_report(raw_text: str) -> ForceReportData:
@@ -118,11 +144,13 @@ def parse_force_report(raw_text: str) -> ForceReportData:
         raw_values[label] = float(value_match.group("value"))
         units[label] = value_match.group("unit") or ""
 
+    normalized_values = {normalize_label(label): value for label, value in raw_values.items()}
+
     return ForceReportData(
         run_name=run_name,
         raw_values=raw_values,
         units=units,
         header_notes=header_notes,
-        CoP=raw_values.get("CoP"),
-        CoP_meters=raw_values.get("CoP meters"),
+        CoP=normalized_values.get("cop"),
+        CoP_meters=normalized_values.get("cop meters"),
     )

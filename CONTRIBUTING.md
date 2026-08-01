@@ -76,9 +76,18 @@ approach used for force report labels (§4).
 
 ## 2. post.zip file categories (summary)
 
-Full detail, including per-category naming patterns and every open
-question, lives in `docs/post_zip_file_format_spec.md` -- read that before
-touching `ingestion/parsers/post_zip_classifier.py`. Quick summary:
+**Decided 2026-08-01: images are no longer classified by filename
+pattern.** Every real batch seen so far has a different image count and
+different names, so matching filenames against fixed per-category regexes
+(the old `ingestion/parsers/post_zip_classifier.py`, now removed) silently
+dropped anything that didn't fit a known shape. `scene_image_refs` now
+lists every file in the post job except `force_reports.txt`, unfiltered --
+see `ingestion/queue_consumer/main.py::format_scene_image_refs`.
+
+The naming patterns below are still real and still documented in full in
+`docs/post_zip_file_format_spec.md` -- useful if you're trying to figure
+out what a given image *is*, e.g. for a future UI grouping feature -- but
+nothing in the pipeline parses against them anymore. Quick summary:
 
 1. **Velocity slices** (`x_`/`y_` prefix) -- variable count/parameter per
    batch. **Open question:** the `x__`/`y__` double-underscore convention's
@@ -99,11 +108,10 @@ touching `ingestion/parsers/post_zip_classifier.py`. Quick summary:
 4. **Setup/reference scenes** -- fixed, always-present (`Vector_Scene_1.png`,
    `Mesh.png`, `Geometry.png`).
 5. **Force report** (`force_reports.txt`) -- the one file that gets parsed
-   into structured rows. Format confirmed against a real sample: raw force
-   values (Newtons) and two CoP representations, not CL/CD coefficients,
-   and no swept-variable/range. See §4/§5 below for the full detail.
-6. **Unclassified/other** -- catch-all for anything not matching 1-5; must
-   be logged with filename + batch folder name rather than silently dropped.
+   into structured rows, and the one file excluded from `scene_image_refs`
+   by name. Format confirmed against a real sample: raw force values
+   (Newtons) and two CoP representations, not CL/CD coefficients, and no
+   swept-variable/range. See §4/§5 below for the full detail.
 
 ## 3. Image handling: link vs. download (decision record)
 
@@ -135,10 +143,9 @@ id either way (whether the post job arrived zipped or as an already-unzipped
 folder -- see the Current scope note above and
 `ingestion/drive-watcher/BatchFolderDetector.gs` case 4).
 `format_scene_image_refs` in `ingestion/queue_consumer/main.py` builds
-`scene_image_refs` as a `;`-joined list of Drive view links (categories 1-4
-only -- not the force report, not the unclassified bucket), using
-`post_zip_classifier.py`'s now-decided per-image dict shape (each entry has
-a `file_name` key).
+`scene_image_refs` as a `;`-joined list of Drive view links for every file
+in the post job except `force_reports.txt` (decided 2026-08-01 -- see §2
+above; no longer filtered through per-category classification).
 
 ## 4. `data/results.csv` schema
 
