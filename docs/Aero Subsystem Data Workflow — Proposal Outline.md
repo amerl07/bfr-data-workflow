@@ -106,12 +106,12 @@ Applied at the **batch folder** level, not to individual files inside.
 **Examples:**
 ```
 NC_UT_NoFillets_Cornering_20260724
-YL_WSK_VariableAoA_Straight_20260529
+YL_WSK_VariableAoA_Straightline_20260529
 ```
 
 **Component codes:** RW (rear wing), FW (front wing), UT (undertray), WSK (whisker), BW (Bodywork)
 
-**Sweep type codes:** CORNER, STRAIGHT, VEL (velocity), YAW, RH (ride height), AOA (angle of attack), COMBO (multi-parameter)
+**Sweep type codes:** CORNERING, STRAIGHTLINE, VEL (velocity), YAW, RH (ride height), AOA (angle of attack), COMBO (multi-parameter). Case-insensitive; the earlier CORNER/STRAIGHT codes (pre-2026-08-01) still parse as aliases of CORNERING/STRAIGHTLINE -- see `ingestion/parsers/sim_filename_parser.py`.
 
 **Rules:**
 - Absence of `FC` implies isolated-component run.

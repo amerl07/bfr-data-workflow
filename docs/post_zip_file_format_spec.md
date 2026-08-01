@@ -168,7 +168,7 @@ Confirming the shape of what the parser produces, since this was still implicit.
 | `job_name` / `sim_file_base` | Job name base (§0) — `{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}` |
 | `post_zip_name` | `post_<job_name>.zip` |
 | `component` / `sim_type` | `COMPONENT` token from the filename (§0; Proposal Outline §5: RW, FW, UT, WSK, BW, FC) |
-| `sweep_type` | `SWEEPTYPE` token from the filename (§0; Proposal Outline §5: CORNER, STRAIGHT, VEL, YAW, RH, AOA, COMBO) |
+| `sweep_type` | `SWEEPTYPE` token from the filename (§0; Proposal Outline §5: CORNERING, STRAIGHTLINE, VEL, YAW, RH, AOA, COMBO). Case-insensitive, and the pre-2026-08-01 `CORNER`/`STRAIGHT` codes are normalized to `CORNERING`/`STRAIGHTLINE` respectively (`sim_filename_parser.py::_SWEEP_TYPE_ALIASES`) — every other code is passed through unchanged. |
 | `isolated_vs_fullcar` | `full_car` iff `COMPONENT == "FC"`, `isolated` otherwise — single filename-level signal now, see §0 |
 | `date` | `YYYYMMDD` from filename |
 | `owner_initials` | From filename |

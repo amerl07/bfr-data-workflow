@@ -35,7 +35,7 @@ naming layer, applied to the job name itself:
 **Examples:**
 ```
 NC_UT_NoFillets_Cornering_20260724
-YL_WSK_VariableAoA_Straight_20260529
+YL_WSK_VariableAoA_Straightline_20260529
 ```
 
 **`.sim` / `post.zip` names:** the job name above is the `.sim` file's base
@@ -48,13 +48,20 @@ i.e. `post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip`.
 **Component codes:** `RW` (rear wing), `FW` (front wing), `UT` (undertray),
 `WSK` (whisker), `BW` (bodywork), `FC` (full car).
 
-**Sweep type codes:** `CORNER`, `STRAIGHT`, `VEL` (velocity), `YAW`,
+**Sweep type codes:** `CORNERING`, `STRAIGHTLINE`, `VEL` (velocity), `YAW`,
 `RH` (ride height), `AOA` (angle of attack), `COMBO` (multi-parameter).
+`CORNER`/`STRAIGHT` (the codes before the Team Usage Guide's 2026-08-01
+update) still parse -- the parser case-insensitively treats them as
+aliases of `CORNERING`/`STRAIGHTLINE` respectively (see
+`sim_filename_parser.py::_SWEEP_TYPE_ALIASES`), so old and new filenames
+land in the same `sweep_type` value in `data/results.csv`.
 
 Neither code list is validated by the parser (`ingestion/parsers/sim_filename_parser.py`)
 -- an unrecognized code still parses fine, it's just not one of the above.
 This matches the same "parse whatever's possible, don't invent/reject"
-approach used for force report labels (§4).
+approach used for force report labels (§4). The CORNER/STRAIGHT aliasing is
+the one exception -- those two codes are specifically known to have two
+live spellings, everything else is passed through as-is.
 
 **Rules:**
 - Each of the five fields is a single token -- no underscores within a

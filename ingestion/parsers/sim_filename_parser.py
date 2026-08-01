@@ -7,13 +7,24 @@ superseded by it):
 
     {INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.sim
 
-e.g. NC_UT_NoFillets_Cornering_20260724, YL_WSK_VariableAoA_Straight_20260529
+e.g. NC_UT_NoFillets_Cornering_20260724, YL_WSK_VariableAoA_Straightline_20260529
 -- five plain (no-underscore) tokens. Component codes: RW, FW, UT, WSK, BW,
-FC (Proposal Outline §5); sweep type codes: CORNER, STRAIGHT, VEL, YAW, RH,
-AOA, COMBO -- neither is validated here (parse whatever's actually there,
-per the "ignore undefined, don't invent" approach used for force labels
-too). Absence of FC as the component implies an isolated-component run
-(Proposal Outline §5's rule) -- there's no separate ISO_ prefix anymore.
+FC (Proposal Outline §5); sweep type codes: CORNERING, STRAIGHTLINE, VEL,
+YAW, RH, AOA, COMBO -- neither is validated here (parse whatever's actually
+there, per the "ignore undefined, don't invent" approach used for force
+labels too). Absence of FC as the component implies an isolated-component
+run (Proposal Outline §5's rule) -- there's no separate ISO_ prefix anymore.
+
+Sweep type is case-insensitively normalized, and the pre-2026-08-01
+abbreviations CORNER/STRAIGHT (the Team Usage Guide's sweep-type codes
+before that date -- see its git history) are treated as equal to
+CORNERING/STRAIGHTLINE respectively, so old and new filenames land in the
+same `sweep_type` bucket in data/results.csv instead of the web app
+splitting them into separate filter groups. See _SWEEP_TYPE_ALIASES. Every
+other sweep type code is left exactly as written in the filename -- no
+case-folding, no alias -- per the "don't invent" approach above; this
+normalization only applies to the two codes now confirmed to have two
+live spellings.
 
 post.zip names wrap the .sim base: post_<job_name>.zip, i.e.
 post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip.
@@ -46,6 +57,27 @@ _JOB_NAME_PATTERN = re.compile(
 )
 
 _FULL_CAR_COMPONENT = "FC"
+
+# Case-insensitive: keys are matched against sweep_type.upper(). Values are
+# the canonical form now documented in the Team Usage Guide (2026-08-01
+# update) -- CORNER/STRAIGHT are the pre-update abbreviations, kept as
+# accepted aliases rather than breaking old filenames.
+_SWEEP_TYPE_ALIASES = {
+    "CORNER": "CORNERING",
+    "CORNERING": "CORNERING",
+    "STRAIGHT": "STRAIGHTLINE",
+    "STRAIGHTLINE": "STRAIGHTLINE",
+}
+
+
+def _normalize_sweep_type(raw_sweep_type: str) -> str:
+    """Case-insensitive canonicalization for the two sweep types confirmed
+    to have two live spellings (CORNER/CORNERING, STRAIGHT/STRAIGHTLINE --
+    see _SWEEP_TYPE_ALIASES and the module docstring). Any other value
+    (VEL, YAW, RH, AOA, COMBO, or an undefined code) is returned exactly as
+    written -- not case-folded, not aliased.
+    """
+    return _SWEEP_TYPE_ALIASES.get(raw_sweep_type.upper(), raw_sweep_type)
 
 
 def parse_sim_filename(filename: str) -> SimFileMetadata:
@@ -85,7 +117,7 @@ def _parse_job_name(raw_name: str, job_name: str) -> SimFileMetadata:
         owner_initials=match.group("initials"),
         component=match.group("component"),
         description=match.group("description"),
-        sweep_type=match.group("sweep_type"),
+        sweep_type=_normalize_sweep_type(match.group("sweep_type")),
         date=match.group("date"),
         is_full_car=match.group("component") == _FULL_CAR_COMPONENT,
         job_name=job_name,
