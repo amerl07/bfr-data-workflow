@@ -32,6 +32,28 @@ function splitRefs(v: string | undefined): string[] {
     .filter(Boolean);
 }
 
+/** Mirrors `sim_filename_parser.py::_SWEEP_TYPE_ALIASES` on the ingestion
+ * side (see CONTRIBUTING.md's sweep-type-codes section): case-insensitive,
+ * and CORNER/STRAIGHT (the pre-2026-08-01 codes) alias to
+ * CORNERING/STRAIGHTLINE. Applied here too, not just at ingestion, because
+ * data/results.csv has rows added by hand (see its git history) that never
+ * went through the Python parser and so kept their original casing/code --
+ * without this, the filter sidebar and detail views split one sweep type
+ * into multiple case- or spelling-variant entries. Every other sweep type
+ * code is left exactly as written, same "don't invent" rule as the Python
+ * side. */
+const SWEEP_TYPE_ALIASES: Record<string, string> = {
+  CORNER: "CORNERING",
+  CORNERING: "CORNERING",
+  STRAIGHT: "STRAIGHTLINE",
+  STRAIGHTLINE: "STRAIGHTLINE",
+};
+
+export function normalizeSweepType(raw: string): string {
+  if (!raw) return raw;
+  return SWEEP_TYPE_ALIASES[raw.toUpperCase()] ?? raw;
+}
+
 /** Pure CSV-text -> SimRow[] parser, split out from fetchResults so it's testable
  * without a network call. */
 export function parseResultsCsv(csvText: string): SimRow[] {
@@ -46,7 +68,7 @@ export function parseResultsCsv(csvText: string): SimRow[] {
       job_name: row.job_name.trim(),
       post_zip_name: row.post_zip_name ?? "",
       component: row.component ?? "",
-      sweep_type: row.sweep_type ?? "",
+      sweep_type: normalizeSweepType(row.sweep_type ?? ""),
       isolated_vs_fullcar: row.isolated_vs_fullcar ?? "",
       date: row.date ?? "",
       dateObj: parseDate(row.date),

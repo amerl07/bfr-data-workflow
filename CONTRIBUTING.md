@@ -54,7 +54,12 @@ i.e. `post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip`.
 update) still parse -- the parser case-insensitively treats them as
 aliases of `CORNERING`/`STRAIGHTLINE` respectively (see
 `sim_filename_parser.py::_SWEEP_TYPE_ALIASES`), so old and new filenames
-land in the same `sweep_type` value in `data/results.csv`.
+land in the same `sweep_type` value in `data/results.csv`. The web app
+(`web/lib/data.ts::normalizeSweepType`) applies the same case-insensitive
+CORNER/STRAIGHT normalization a second time when it reads
+`data/results.csv`, since a handful of rows in that file were added by
+hand and bypassed this parser, so their `sweep_type` casing/code wouldn't
+otherwise match rows the parser produced.
 
 Neither code list is validated by the parser (`ingestion/parsers/sim_filename_parser.py`)
 -- an unrecognized code still parses fine, it's just not one of the above.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseResultsCsv } from "@/lib/data";
+import { normalizeSweepType, parseResultsCsv } from "@/lib/data";
 
 const HEADER =
   "job_name,post_zip_name,component,sweep_type,isolated_vs_fullcar,date,owner_initials," +
@@ -66,5 +66,36 @@ describe("parseResultsCsv", () => {
       "\n",
     );
     expect(parseResultsCsv(csv).map((r) => r.job_name)).toEqual(["A", "B", "C"]);
+  });
+
+  it("normalizes sweep_type case and CORNER/STRAIGHT aliases so legacy hand-added rows match ingested ones", () => {
+    const csv = [
+      HEADER,
+      row({ job_name: "A", sweep_type: "CORNERING" }),
+      row({ job_name: "B", sweep_type: "Cornering" }),
+      row({ job_name: "C", sweep_type: "corner" }),
+      row({ job_name: "D", sweep_type: "straightline" }),
+      row({ job_name: "E", sweep_type: "Straight" }),
+      row({ job_name: "F", sweep_type: "YAW" }),
+    ].join("\n");
+    expect(parseResultsCsv(csv).map((r) => r.sweep_type)).toEqual([
+      "CORNERING",
+      "CORNERING",
+      "CORNERING",
+      "STRAIGHTLINE",
+      "STRAIGHTLINE",
+      "YAW",
+    ]);
+  });
+});
+
+describe("normalizeSweepType", () => {
+  it("passes through an empty string unchanged", () => {
+    expect(normalizeSweepType("")).toBe("");
+  });
+
+  it("leaves undefined/unlisted codes exactly as written", () => {
+    expect(normalizeSweepType("Combo")).toBe("Combo");
+    expect(normalizeSweepType("AOA")).toBe("AOA");
   });
 });
