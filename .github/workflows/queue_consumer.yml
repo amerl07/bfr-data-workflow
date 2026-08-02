@@ -6,11 +6,16 @@ name: Run queue consumer
 # (see ingestion/drive-watcher/README.md) -- same tradeoff, just one layer
 # further down the pipeline: a dumb timer beats a push mechanism that has
 # to actually fire.
+#
+# The `schedule:` trigger below is a low-priority fallback only -- GitHub
+# treats it as best-effort and observed gaps of 1.5-3 hours against this
+# same 5-minute cron (found 2026-07-29), not a bug in this config. The
+# real trigger is an external cron service (e.g. cron-job.org) calling the
+# `workflow_dispatch` REST API on an actual schedule -- see README.md's
+# "Automated ingestion" section for setup. Both triggers share the
+# concurrency group below, so overlap between them is harmless.
 on:
   schedule:
-    # Every 5 minutes. GitHub can delay scheduled runs under load,
-    # especially right on the hour -- fine here, this is a fallback poller
-    # with no latency guarantee, not a real-time trigger.
     - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
@@ -35,10 +40,10 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Write service account key
+      - name: Write OAuth token
         env:
-          GCP_SERVICE_ACCOUNT_JSON: ${{ secrets.GCP_SERVICE_ACCOUNT_JSON }}
-        run: echo "$GCP_SERVICE_ACCOUNT_JSON" > ingestion/queue_consumer/service-account.json
+          GOOGLE_OAUTH_TOKEN_JSON: ${{ secrets.GOOGLE_OAUTH_TOKEN_JSON }}
+        run: echo "$GOOGLE_OAUTH_TOKEN_JSON" > ingestion/queue_consumer/token.json
 
       - name: Run queue consumer
         run: python -m ingestion.queue_consumer.main

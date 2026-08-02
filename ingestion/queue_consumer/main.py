@@ -19,30 +19,39 @@ involved, folder_name_parser -- still stubs. This consumer treats a stub's
 NotImplementedError as an expected, not-yet-unblocked state: it marks the
 row "blocked: <reason>" and moves on, rather than faking a result row.
 
-Runs two ways -- see get_credentials():
-- Scheduled/automated (.github/workflows/queue_consumer.yml): a service
-  account, no browser involved. One-time setup:
-  1. In Google Cloud Console, create a Service Account (same project as
-     below, or a new one) and enable the Google Sheets API and Google Drive
-     API for that project.
-  2. Create a JSON key for it and note its "client_email" field.
-  3. Share the watched Drive folder (Config.gs's WATCHED_FOLDER_ID) AND the
-     queue spreadsheet (QUEUE_SPREADSHEET_ID below) with that client_email
-     as Editor -- service accounts don't inherit access from whoever
-     created them, they need to be invited like any other collaborator.
-  4. Paste the full key JSON into a GitHub repo secret named
-     GCP_SERVICE_ACCOUNT_JSON (Settings -> Secrets and variables -> Actions).
-     The workflow writes it to ingestion/queue_consumer/service-account.json
-     at runtime; that path is gitignored so it never gets committed.
-- Interactive/local: OAuth installed-app flow, used automatically when
-  service-account.json isn't present.
-  1. In Google Cloud Console, create an OAuth 2.0 Client ID of type
-     "Desktop app". Enable the same two APIs.
-  2. Download the client secret JSON and save it as
-     ingestion/queue_consumer/credentials.json (gitignored).
-  3. Run `python -m ingestion.queue_consumer.main` from the repo root. The
-     first run opens a browser for one-time consent; a token is then cached
-     at ingestion/queue_consumer/token.json (also gitignored) for later runs.
+Auth -- see get_credentials(). Both local runs and the scheduled GitHub
+Actions run use the *same* OAuth installed-app credentials (a real Google
+account, not a service account): a service account was tried first for the
+automated run (see git history / .github/workflows/queue_consumer.yml
+before 2026-08-01) but Drive rejects file creation from a service account
+outside a Shared Drive with "Service Accounts do not have storage quota"
+(storageQuotaExceeded) -- upload_extracted_images below needs to create new
+Drive files, and this project doesn't have Shared Drive creation rights on
+its Workspace org. Using a real account's OAuth token sidesteps that: every
+Drive/Sheets call runs as that account, with its normal quota.
+
+One-time setup (local):
+1. In Google Cloud Console, create an OAuth 2.0 Client ID of type
+   "Desktop app". Enable the Sheets and Drive APIs for that project. Set
+   the OAuth consent screen's audience to Internal (or otherwise published)
+   -- an External+Testing app's refresh tokens silently expire after 7
+   days, which would break the scheduled CI run without warning.
+2. Download the client secret JSON and save it as
+   ingestion/queue_consumer/credentials.json (gitignored).
+3. Run `python -m ingestion.queue_consumer.main` from the repo root. The
+   first run opens a browser for one-time consent; a token (including a
+   refresh_token, which is what makes unattended CI runs possible -- no
+   browser needed once one exists) is then cached at
+   ingestion/queue_consumer/token.json (also gitignored).
+
+One-time setup (CI): paste the full contents of the token.json produced
+above into a GitHub repo secret named GOOGLE_OAUTH_TOKEN_JSON (Settings ->
+Secrets and variables -> Actions). The workflow
+(.github/workflows/queue_consumer.yml) writes it to
+ingestion/queue_consumer/token.json at runtime; from there get_credentials()
+refreshes it exactly like a local run would. If the refresh_token is ever
+revoked or expires, re-run step 3 above locally and update the secret with
+the new token.json contents.
 """
 
 import io
@@ -51,8 +60,8 @@ import zipfile
 import csv
 from pathlib import Path
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
-from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
@@ -88,7 +97,6 @@ SCOPES = [
 _MODULE_DIR = Path(__file__).resolve().parent
 CREDENTIALS_PATH = _MODULE_DIR / "credentials.json"
 TOKEN_PATH = _MODULE_DIR / "token.json"
-SERVICE_ACCOUNT_PATH = _MODULE_DIR / "service-account.json"
 
 # Force labels confirmed present in every real force_reports.txt sample so
 # far (docs/force_reports.txt, plus every real upload processed since) --
@@ -149,23 +157,33 @@ def main():
 
 
 def get_credentials():
-    """Service account first -- what the scheduled GitHub Actions run uses
-    (see module docstring, .github/workflows/queue_consumer.yml), no
-    browser needed. Falls back to the OAuth installed-app flow for
-    interactive local runs that don't have a service-account.json, with the
-    resulting token cached locally so only the first run needs consent."""
-    if SERVICE_ACCOUNT_PATH.exists():
-        return service_account.Credentials.from_service_account_file(
-            str(SERVICE_ACCOUNT_PATH), scopes=SCOPES
-        )
-
+    """OAuth installed-app credentials -- see module docstring for why this
+    (not a service account) is used for both local and CI runs. token.json
+    is either already cached locally from a prior interactive run, or
+    written fresh by the CI workflow from the GOOGLE_OAUTH_TOKEN_JSON
+    secret; either way, its refresh_token lets this refresh silently with
+    no browser. Only a genuinely first-ever run (no token.json anywhere)
+    falls back to the interactive consent flow, which requires
+    credentials.json and a browser -- i.e. local-only, never CI."""
     creds = None
     if TOKEN_PATH.exists():
         creds = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            try:
+                creds.refresh(Request())
+            except RefreshError as exc:
+                raise RuntimeError(
+                    "OAuth refresh failed -- token.json's refresh_token is no "
+                    "longer valid (revoked, or expired from 7-day Testing-mode "
+                    "OAuth consent screen expiry). Re-run "
+                    "`.venv/bin/python -m ingestion.queue_consumer.main` "
+                    "locally to regenerate ingestion/queue_consumer/token.json "
+                    "via the interactive consent flow, then update the "
+                    "GOOGLE_OAUTH_TOKEN_JSON GitHub repo secret with its new "
+                    "contents."
+                ) from exc
         else:
             flow = InstalledAppFlow.from_client_secrets_file(str(CREDENTIALS_PATH), SCOPES)
             creds = flow.run_local_server(port=0)
