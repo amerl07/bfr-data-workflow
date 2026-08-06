@@ -51,6 +51,11 @@ jobs:
           # Tells next.config.ts to prefix output with the /bfr-data-workflow
           # project-pages path; unset for local dev/build.
           GITHUB_PAGES: "true"
+          # Baked into the client bundle at build time (this is a static
+          # export -- there is no server to hide it behind). Protect it with
+          # an HTTP referrer restriction in the GCP console, not secrecy.
+          # See web/README.md#drive-api-key.
+          NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY: ${{ secrets.GOOGLE_DRIVE_API_KEY }}
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -21,3 +21,24 @@ export function driveViewUrl(url: string): string {
   const id = extractDriveFileId(url);
   return id ? `https://drive.google.com/file/d/${id}/view` : url;
 }
+
+const DRIVE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY;
+
+/** Drive API v3 files.get endpoint for a public ("anyone with the link")
+ * file's name. Null if no id can be extracted or no API key is configured
+ * (see web/README.md#drive-api-key) -- callers should fall back to a
+ * positional label in that case. */
+export function driveFileMetadataUrl(url: string): string | null {
+  const id = extractDriveFileId(url);
+  if (!id || !DRIVE_API_KEY) return null;
+  return `https://www.googleapis.com/drive/v3/files/${id}?fields=name&key=${DRIVE_API_KEY}`;
+}
+
+export async function fetchDriveFileName(url: string): Promise<string | null> {
+  const endpoint = driveFileMetadataUrl(url);
+  if (!endpoint) return null;
+  const res = await fetch(endpoint);
+  if (!res.ok) return null;
+  const data = (await res.json()) as { name?: string };
+  return data.name ?? null;
+}

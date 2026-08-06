@@ -19,6 +19,37 @@ of the live repo CSV during development:
 NEXT_PUBLIC_DATA_URL=http://localhost:3000/some-fixture.csv npm run dev
 ```
 
+### Drive API key
+
+Scene Gallery hover labels (real Drive filenames, not just "Image N") need a
+Drive API key at `NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY`. Without it, the gallery
+silently falls back to positional labels -- this is optional, not required
+to run the site.
+
+To provision one:
+
+1. GCP Console -> APIs & Services -> Credentials -> Create Credentials ->
+   API key.
+2. Restrict it: **API restrictions** -> Google Drive API only.
+   **Application restrictions** -> HTTP referrers -> add
+   `https://<username>.github.io/bfr-data-workflow/*` (and
+   `http://localhost:3000/*` for local dev, or use a separate dev-only key).
+3. This is a static export -- the key ends up in the public JS bundle
+   regardless of how it's injected. The referrer restriction above is the
+   actual protection, not keeping the key secret.
+4. Only works for files shared "Anyone with the link" (same requirement
+   already implied by the thumbnail/view links -- see `lib/drive.ts`).
+
+For local dev, put it in `web/.env.local` (gitignored):
+
+```bash
+NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY=your-key-here
+```
+
+For deploys, add it as the repo secret `GOOGLE_DRIVE_API_KEY` (Settings ->
+Secrets and variables -> Actions) -- `.github/workflows/deploy.yml` passes it
+through to the build as `NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY`.
+
 ## Test
 
 ```bash

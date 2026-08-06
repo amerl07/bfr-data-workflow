@@ -54,6 +54,8 @@ export function SimulationView() {
         <ForceBreakdown row={row} />
       </section>
 
+      <RawDataPanel raw={row.raw_force_values} />
+
       <SweepInformation row={row} />
 
       <section>
@@ -62,8 +64,6 @@ export function SimulationView() {
       </section>
 
       <SourceFiles row={row} />
-
-      <RawDataPanel raw={row.raw_force_values} />
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Related Simulations</h2>
