@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, ExternalLink, ImageOff, Layers, X, ZoomIn, ZoomOut } from "lucide-react";
 import { driveThumbnailUrl, driveViewUrl } from "@/lib/drive";
 import { useDriveFileName } from "@/hooks/useDriveFileName";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
+import { NumericSlider } from "@/components/shared/numeric-slider";
 import { ImageOverlay } from "@/components/shared/image-overlay";
 import { EmptyState } from "@/components/status";
 import { cn } from "@/lib/utils";
@@ -98,11 +98,33 @@ function SelectedOverlay({ images, urls }: { images: string[]; urls: [string, st
   );
 }
 
-export function SceneGallery({ images }: { images: string[] }) {
+export function SceneGallery({
+  images,
+  selectionLimit = 2,
+  selectLabel = "Compare 2 images",
+  onSelectionChange,
+}: {
+  images: string[];
+  /** Max images selectable in compare mode. 2 (default) shows an inline
+   * overlay comparison between two images from this gallery. 1 is for a
+   * caller that combines the pick with a selection from elsewhere (e.g.
+   * comparing one image from each of two simulations). */
+  selectionLimit?: number;
+  selectLabel?: string;
+  onSelectionChange?: (selected: string[]) => void;
+}) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [thumbSize, setThumbSize] = useState(DEFAULT_THUMB_SIZE);
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+
+  // Notify the parent from an effect, not from inside the setSelected
+  // updater -- calling a different component's setState mid-render (which
+  // functional updaters run under) trips React's cross-component update
+  // warning.
+  useEffect(() => {
+    onSelectionChange?.(selected);
+  }, [selected, onSelectionChange]);
 
   if (images.length === 0) {
     return <EmptyState message="No scene images for this simulation." />;
@@ -111,7 +133,7 @@ export function SceneGallery({ images }: { images: string[] }) {
   function toggleSelect(url: string) {
     setSelected((prev) => {
       if (prev.includes(url)) return prev.filter((u) => u !== url);
-      if (prev.length >= 2) return prev;
+      if (prev.length >= selectionLimit) return selectionLimit === 1 ? [url] : prev;
       return [...prev, url];
     });
   }
@@ -127,23 +149,22 @@ export function SceneGallery({ images }: { images: string[] }) {
   return (
     <>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <ZoomOut className="h-4 w-4 shrink-0 text-slate-400" />
-          <Slider
-            value={[thumbSize]}
-            onValueChange={([v]) => setThumbSize(v)}
-            min={MIN_THUMB_SIZE}
-            max={MAX_THUMB_SIZE}
-            step={10}
-            className="w-28"
-          />
-          <ZoomIn className="h-4 w-4 shrink-0 text-slate-400" />
-        </div>
+        <NumericSlider
+          value={thumbSize}
+          onChange={setThumbSize}
+          min={MIN_THUMB_SIZE}
+          max={MAX_THUMB_SIZE}
+          step={10}
+          unit="px"
+          decrementIcon={<ZoomOut className="h-4 w-4" />}
+          incrementIcon={<ZoomIn className="h-4 w-4" />}
+          aria-label="Thumbnail size"
+        />
 
         {compareMode ? (
           <div className="flex items-center gap-2 text-sm">
             <span className="text-slate-500 dark:text-slate-400">
-              Select 2 images to compare ({selected.length}/2)
+              Select {selectionLimit} image{selectionLimit === 1 ? "" : "s"} ({selected.length}/{selectionLimit})
             </span>
             <button
               type="button"
@@ -159,7 +180,7 @@ export function SceneGallery({ images }: { images: string[] }) {
             onClick={() => setCompareMode(true)}
             className="flex items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
           >
-            <Layers className="h-3 w-3" /> Compare 2 images
+            <Layers className="h-3 w-3" /> {selectLabel}
           </button>
         )}
       </div>
@@ -181,7 +202,7 @@ export function SceneGallery({ images }: { images: string[] }) {
         ))}
       </div>
 
-      {compareMode && selected.length === 2 && (
+      {compareMode && selectionLimit >= 2 && selected.length === selectionLimit && (
         <div className="mt-6 rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           <h3 className="mb-3 text-sm font-semibold">Overlay Comparison</h3>
           <SelectedOverlay images={images} urls={[selected[0], selected[1]]} />

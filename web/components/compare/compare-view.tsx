@@ -5,8 +5,7 @@ import { useSimulations } from "@/hooks/useSimulations";
 import { SimPicker } from "@/components/compare/sim-picker";
 import { MetadataDiffTable } from "@/components/compare/metadata-diff-table";
 import { PerformanceDiffTable } from "@/components/compare/performance-diff-table";
-import { SyncedGalleries } from "@/components/compare/synced-galleries";
-import { OverlayCompare } from "@/components/compare/overlay-compare";
+import { CompareGalleries } from "@/components/compare/compare-galleries";
 import { LoadingState, ErrorState, EmptyState } from "@/components/status";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -64,12 +63,7 @@ export function CompareView() {
 
           <section>
             <h2 className="mb-3 text-lg font-semibold">Scene Galleries</h2>
-            <SyncedGalleries a={a} b={b} />
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-lg font-semibold">Image Overlay</h2>
-            <OverlayCompare a={a} b={b} />
+            <CompareGalleries a={a} b={b} />
           </section>
         </>
       )}
