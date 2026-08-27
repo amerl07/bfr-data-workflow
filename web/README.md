@@ -21,10 +21,25 @@ NEXT_PUBLIC_DATA_URL=http://localhost:3000/some-fixture.csv npm run dev
 
 ### Drive API key
 
-Scene Gallery hover labels (real Drive filenames, not just "Image N") need a
-Drive API key at `NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY`. Without it, the gallery
-silently falls back to positional labels -- this is optional, not required
-to run the site.
+Scene Gallery real Drive filenames (hover labels, alphabetical sort, and the
+"Search by image name" box) need a Drive API key at
+`NEXT_PUBLIC_GOOGLE_DRIVE_API_KEY`. Without it, the gallery silently falls
+back to positional labels ("Image N") for all three -- this is optional, not
+required to run the site.
+
+**Quota note (2026-08-28):** as of this writing, `SceneGallery` fetches
+*every* image's name as soon as the gallery mounts (`useDriveFileNames`), not
+lazily on hover (`useDriveFileName`, still used for one-off lookups like a
+selected compare-overlay image) -- this is what makes sorting/searching by
+name possible, at the cost of one `files.get` call per image per gallery
+load. Galleries currently run up to ~75 images, and the Compare tab renders
+two side by side (~150 calls on one page view). Per [Google's published Drive
+API limits](https://developers.google.com/workspace/drive/api/guides/limits)
+(updated May 2026), a `files.get` read costs 5 quota units against a
+325,000-unit-per-minute-per-user budget -- so this is nowhere close to the
+limit at current gallery sizes, but if galleries grow substantially or many
+users load the Compare tab concurrently, this is the first place to look for
+`403`/`429` errors from the Drive API.
 
 To provision one:
 
@@ -73,7 +88,10 @@ Source to "GitHub Actions" (not yet enabled as of this writing).
 - `lib/` -- CSV fetch/parse, filters, metrics, stats, colors (pure,
   unit-tested functions; no React).
 - `hooks/` -- `useSimulations` (React Query wrapper around `lib/data.ts`),
-  `useFilters` (URL-synced filter state), `useColorMode`.
+  `useFilters` (URL-synced filter state), `useColorMode`, `useStarred`
+  (localStorage-persisted starred simulations), `useDriveFileName` /
+  `useDriveFileNames` (one-off vs. whole-gallery Drive filename lookups --
+  see the Drive API key section above for the quota tradeoff between them).
 - `components/ui/` -- small Radix-based primitives (shadcn/ui-style).
 - `components/{explorer,detail,compare,performance,analytics}/` -- one
   directory per page.
