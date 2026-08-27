@@ -14,8 +14,8 @@ const CATEGORICAL_OPTIONS: { key: CategoricalKey; label: string }[] = [
 
 const SIZE_OPTIONS: { key: SizeKey; label: string }[] = [
   { key: "cell_count", label: "Cell Count" },
-  { key: "total_df", label: "Total DF" },
-  { key: "total_drag", label: "Total Drag" },
+  { key: "full_car_df", label: "Total DF" },
+  { key: "full_car_drag", label: "Total Drag" },
 ];
 
 interface AxisControlsProps {

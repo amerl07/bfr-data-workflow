@@ -19,7 +19,7 @@ export type CategoricalKey =
   | "isolated_vs_fullcar"
   | "swept_variable";
 
-export type SizeKey = "cell_count" | "total_df" | "total_drag";
+export type SizeKey = "cell_count" | "full_car_df" | "full_car_drag";
 
 interface ScatterPlotProps {
   rows: SimRow[];

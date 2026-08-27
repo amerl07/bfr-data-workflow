@@ -4,7 +4,7 @@ import { mean } from "@/lib/stats";
 import { formatDate, formatNumber } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-function numeric(rows: SimRow[], key: "total_df" | "total_drag" | "cell_count"): number[] {
+function numeric(rows: SimRow[], key: "full_car_df" | "full_car_drag" | "cell_count"): number[] {
   return rows.map((r) => r[key]).filter((v): v is number => v !== null);
 }
 
@@ -21,8 +21,8 @@ export function StatCards({ rows }: { rows: SimRow[] }) {
     { label: "Total Simulations", value: rows.length.toLocaleString() },
     { label: "Components", value: components.length.toLocaleString() },
     { label: "Owners", value: owners.length.toLocaleString() },
-    { label: "Avg Total DF", value: formatNumber(mean(numeric(rows, "total_df")), { unit: "N" }) },
-    { label: "Avg Drag", value: formatNumber(mean(numeric(rows, "total_drag")), { unit: "N" }) },
+    { label: "Avg Total DF", value: formatNumber(mean(numeric(rows, "full_car_df")), { unit: "N" }) },
+    { label: "Avg Drag", value: formatNumber(mean(numeric(rows, "full_car_drag")), { unit: "N" }) },
     {
       label: "Avg Cell Count",
       value: formatNumber(mean(numeric(rows, "cell_count")), { digits: 0 }),

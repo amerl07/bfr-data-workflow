@@ -1,10 +1,5 @@
 """Parses force_reports.txt, the primary numeric artifact in a post.zip.
 
-Format confirmed against two real samples: docs/force_reports.txt (run
-"NC_B27_UT_Cornering_No_Fillets_20260724") and
-docs/"force_reports copy.txt" (run
-"DY_RW_newMainplaneGurney_straightline_20260731"):
-
     # <arbitrary header comment lines, '#'-prefixed>
     <Label>          <value>          <unit-or-blank>
     ...
@@ -15,27 +10,8 @@ sample has:
     # raw report values (half-car, undoubled) per BFR_CFD_Standards
     # DF sign convention: downforce reads negative
 
-Confirmed findings from that one sample, plus decisions made on each
-(2026-07-26) -- treat the findings as confirmed for this format, not
-guessed, but this is still a single sample:
 
-- There is NO CL/CD (dimensionless coefficient) in this file -- only raw
-  forces in Newtons ("Total DF", "Total Drag", "Body DF", "RW Drag", "FW
-  DF", "RW DF", "UT DF", "Total Aero DF", "Wheel DF", "Whisker DF") plus a
-  couple of non-force values ("CoP", "CoP meters", "Cell count"). Computing
-  a true CL/CD coefficient needs a reference velocity, reference area, and
-  air density (F = 0.5 * rho * V^2 * A * C) -- none of which appear here,
-  and getting those parameters out of the sims is hard for this team right
-  now. DECIDED: store the raw force values instead of CL/CD for now (see
-  data/results.csv's `raw_force_values` column and
-  ingestion/queue_consumer/main.py::format_raw_force_values) -- nothing
-  here computes a coefficient.
-- "CoP" (e.g. 53.437586, unitless) and "CoP meters" (e.g. 0.841642, m) are
-  two different representations of center of pressure in the same file --
-  the unitless one is a percentage. DECIDED: keep both;
-  ForceReportData.CoP is the percentage, CoP_meters is the absolute
-  distance.
-- swept_variable / swept_range are NOT present anywhere in this file. This
+- swept_variable / swept_range are NOT present anywhere in this file YET. This
   answers the previously-open question from Proposal Outline §6 / spec §5,
   at least for a single-run export like this one -- ForceReportData always
   returns them as None. If sweep data needs to be captured, it'll have to
@@ -47,21 +23,6 @@ guessed, but this is still a single sample:
   (header_notes) so the caveat travels with the data rather than getting
   lost.
 
-New finding from the second sample (2026-08-01), which broke both the line
-regex and every label lookup until fixed:
-- That export spells every label with underscores instead of spaces
-  ("Body_DF" vs "Body DF", "CoP_Meters" vs "CoP meters" -- note the
-  differing capitalization too), and adds four labels never seen before
-  ("Radiator_MFR", "Inlet_MFA", "Outlet_MFA", "Pressure_Drop" -- cooling/
-  pressure figures, not forces). DECIDED: `_VALUE_LINE_PATTERN` now accepts
-  underscores (and `/` in the unit, for "kg/s"), and every label lookup
-  (CoP/CoP_meters here, FORCE_LABEL_COLUMNS in
-  ingestion/queue_consumer/main.py) goes through `normalize_label` so both
-  spellings resolve to the same field/column. `raw_values`/`raw_force_values`
-  still key on the label exactly as written in the file -- only lookups are
-  normalized, not storage. The four new labels have no dedicated column
-  (per the 2026-07-29 "don't invent columns for undefined labels" decision
-  above) -- they stay in raw_force_values only.
 """
 
 import re
@@ -83,8 +44,16 @@ class ForceReportData:
     # docstring. No CL/CD field -- see data/results.csv's
     # `raw_force_values` column instead. swept_variable/swept_range are
     # confirmed absent from this file format.
-    CoP: Optional[float] = None  # percentage
-    CoP_meters: Optional[float] = None
+    #
+    # CoP/CoP_meters used to live here too, but as of 2026-08-27 they're
+    # unified into the same generic label->column mechanism as every other
+    # force value (FORCE_LABEL_COLUMNS in ingestion/queue_consumer/main.py,
+    # keyed off raw_values via normalize_label) -- there was nothing
+    # actually special about them needing their own dataclass fields.
+    # "CoP" and "CoP meters" are still two distinct labels in the source
+    # file (a percentage and an absolute distance respectively), so they
+    # still end up as two distinct results.csv columns -- unifying the
+    # *mechanism* doesn't merge the *fields*.
     swept_variable: Optional[str] = None
     swept_range: Optional[str] = None
 
@@ -110,8 +79,11 @@ def normalize_label(label: str) -> str:
 def parse_force_report(raw_text: str) -> ForceReportData:
     """Parses the raw label/value/unit rows and header comments. See this
     module's docstring for the decisions behind which fields are/aren't
-    populated (no CL/CD; CoP and CoP_meters both kept; swept_variable/
-    swept_range always None for this format).
+    populated (no CL/CD; swept_variable/swept_range always None for this
+    format). CoP/CoP_meters aren't separate outputs here -- they're just
+    two more entries in raw_values, resolved into their own results.csv
+    columns the same generic way as every other force label (see
+    ingestion/queue_consumer/main.py::FORCE_LABEL_COLUMNS).
     """
     run_name = None
     header_notes: List[str] = []
@@ -134,9 +106,6 @@ def parse_force_report(raw_text: str) -> ForceReportData:
 
         value_match = _VALUE_LINE_PATTERN.match(line)
         if not value_match:
-            # Doesn't match the label/value/unit shape -- this format is
-            # only confirmed against one sample and could easily vary, so
-            # don't silently drop an unrecognized line.
             header_notes.append(f"UNPARSED: {line}")
             continue
 
@@ -144,13 +113,9 @@ def parse_force_report(raw_text: str) -> ForceReportData:
         raw_values[label] = float(value_match.group("value"))
         units[label] = value_match.group("unit") or ""
 
-    normalized_values = {normalize_label(label): value for label, value in raw_values.items()}
-
     return ForceReportData(
         run_name=run_name,
         raw_values=raw_values,
         units=units,
         header_notes=header_notes,
-        CoP=normalized_values.get("cop"),
-        CoP_meters=normalized_values.get("cop meters"),
     )

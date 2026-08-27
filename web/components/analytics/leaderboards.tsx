@@ -15,18 +15,12 @@ interface BoardDef {
 
 const BOARDS: BoardDef[] = [
   {
-    label: "Highest Total Downforce",
-    valueFn: (r) => (r.total_df === null ? null : Math.abs(r.total_df)),
+    label: "Highest Full Car Downforce",
+    valueFn: (r) => (r.full_car_df === null ? null : Math.abs(r.full_car_df)),
     order: "desc",
     unit: "N",
   },
-  { label: "Lowest Total Drag", valueFn: (r) => r.total_drag, order: "asc", unit: "N" },
-  {
-    label: "Highest Total Aero DF",
-    valueFn: (r) => (r.total_aero_df === null ? null : Math.abs(r.total_aero_df)),
-    order: "desc",
-    unit: "N",
-  },
+  { label: "Lowest Full Car Drag", valueFn: (r) => r.full_car_drag, order: "asc", unit: "N" },
   {
     label: "Largest Wheel DF",
     valueFn: (r) => (r.wheel_df === null ? null : Math.abs(r.wheel_df)),

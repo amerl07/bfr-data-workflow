@@ -8,7 +8,7 @@ import { divergingColor, textColorForBg } from "@/lib/colors";
 import { useColorMode } from "@/hooks/useColorMode";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const HEATMAP_METRICS: NumericMetricKey[] = METRICS.filter((m) => m.key !== "CoP_meters").map(
+const HEATMAP_METRICS: NumericMetricKey[] = METRICS.filter((m) => m.key !== "full_car_CoP_meters").map(
   (m) => m.key,
 );
 

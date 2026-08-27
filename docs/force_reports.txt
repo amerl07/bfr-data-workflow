@@ -1,17 +1,49 @@
-# BFR report export   run: NC_B27_UT_Cornering_No_Fillets_20260724
+# BFR report export   run: DY_RW_v6_singleBiplane_Straight_20260825_1200
 # raw report values (half-car, undoubled) per BFR_CFD_Standards
 # DF sign convention: downforce reads negative
 
-Body DF                                               10.759581  N
-CoP                                                   53.437586  
-CoP meters                                             0.841642  m
-RW Drag                                               40.157203  N
-FW DF                                                -60.274081  N
-RW DF                                                -91.399461  N
-Total Drag                                            90.462571  N
-Total DF                                            -187.845544  N
-UT DF                                                -58.919861  N
-Cell count                                     113474511.000000  
-Total Aero DF                                       -195.549623  N
-Wheel DF                                             -51.215782  N
-Whisker DF                                             4.284199  N
+Full Car CoP (Meters)                                  0.792917  m
+Full Car CoP                                          50.343937  
+Radiator MF Rate                                       0.301021  kg/s
+Inlet MF Averaged Pressure                            63.743013  Pa
+Outlet MF Averaged Pressure                           42.743019  Pa
+Pressure Drop                                         20.999994  
+Cell Count                                      38790593.000000  
+Frontal Area                                           0.562083  m^2
+UT CoP (Meters)                                        0.681927  m
+RW CoP (Meters)                                        1.746729  m
+RW Area                                                2.124155  m^2
+FW Area                                                1.145667  m^2
+UT Area                                                1.441561  m^2
+ClA                                                   -1.835702  
+CdA                                                    0.712261  
+RW DF                                                -88.890698  N
+UT DF                                                -99.757235  N
+FW DF                                                -85.876593  N
+Body DF                                                8.299255  N
+Wheel DF                                               9.208175  N
+Whisker DF                                             4.020613  N
+Full Car DF                                         -252.982685  N
+Radiator DF                                            0.268384  N
+Body Drag                                             24.790488  N
+Full Car Drag                                         98.158511  N
+FW Drag                                                8.517000  N
+RW Drag                                               42.582267  N
+UT Drag                                               11.771734  N
+Wheel Drag                                            10.171958  N
+Whisker Drag                                          -0.518958  N
+Radiator Drag                                          1.290001  N
+EL4 DF                                               -63.258899  N
+EL5 DF                                               -14.392109  N
+EL6 DF                                                -4.019094  N
+EL7 DF                                                -7.041415  N
+Endplate DF                                            0.053226  N
+Swan Neck DF                                          -0.024306  N
+Carbon Rod DF                                         -0.208101  N
+Carbon Rod Drag                                        1.097877  N
+EL4 Drag                                              12.217796  N
+EL5 Drag                                              15.574406  N
+EL6 Drag                                               9.403267  N
+EL7 Drag                                               0.386196  N
+Endplate Drag                                          3.796908  N
+Swan Neck Drag                                         0.105818  N

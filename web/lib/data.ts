@@ -75,19 +75,59 @@ export function parseResultsCsv(csvText: string): SimRow[] {
       owner_initials: row.owner_initials ?? "",
       raw_force_values: row.raw_force_values ?? "",
 
+      // Downforce panel
+      full_car_df: toNumber(row.full_car_df),
+      total_aero_df: toNumber(row.total_aero_df),
       body_df: toNumber(row.body_df),
-      rw_drag: toNumber(row.rw_drag),
       fw_df: toNumber(row.fw_df),
       rw_df: toNumber(row.rw_df),
-      total_drag: toNumber(row.total_drag),
-      total_df: toNumber(row.total_df),
       ut_df: toNumber(row.ut_df),
-      cell_count: toNumber(row.cell_count),
-      total_aero_df: toNumber(row.total_aero_df),
       wheel_df: toNumber(row.wheel_df),
-      whisker_df: toNumber(row.whisker_df),
-      CoP: toNumber(row.CoP),
-      CoP_meters: toNumber(row.CoP_meters),
+      endplate_df: toNumber(row.endplate_df),
+      swan_neck_df: toNumber(row.swan_neck_df),
+      carbon_rod_df: toNumber(row.carbon_rod_df),
+      EL4_df: toNumber(row.EL4_df),
+      EL5_df: toNumber(row.EL5_df),
+      EL6_df: toNumber(row.EL6_df),
+      EL7_df: toNumber(row.EL7_df),
+
+      // Drag panel
+      full_car_drag: toNumber(row.full_car_drag),
+      body_drag: toNumber(row.body_drag),
+      fw_drag: toNumber(row.fw_drag),
+      rw_drag: toNumber(row.rw_drag),
+      ut_drag: toNumber(row.ut_drag),
+      wheel_drag: toNumber(row.wheel_drag),
+      endplate_drag: toNumber(row.endplate_drag),
+      swan_neck_dragf: toNumber(row.swan_neck_dragf),
+      carbon_rod_drag: toNumber(row.carbon_rod_drag),
+      EL4_drag: toNumber(row.EL4_drag),
+      EL5_drag: toNumber(row.EL5_drag),
+      EL6_drag: toNumber(row.EL6_drag),
+      EL7_drag: toNumber(row.EL7_drag),
+
+      // Area and Coefficients panel
+      frontal_area: toNumber(row.frontal_area),
+      RW_area: toNumber(row.RW_area),
+      FW_area: toNumber(row.FW_area),
+      UT_area: toNumber(row.UT_area),
+      ClA: toNumber(row.ClA),
+      CdA: toNumber(row.CdA),
+
+      // Center of Pressure panel
+      full_car_CoP: toNumber(row.full_car_CoP),
+      full_car_CoP_meters: toNumber(row.full_car_CoP_meters),
+      UT_CoP_meters: toNumber(row.UT_CoP_meters),
+      RW_CoP_meters: toNumber(row.RW_CoP_meters),
+
+      // Radiator panel
+      radiator_MFR: toNumber(row.radiator_MFR),
+      inlet_MF_averaged_pressure: toNumber(row.inlet_MF_averaged_pressure),
+      outlet_MF_averaged_pressure: toNumber(row.outlet_MF_averaged_pressure),
+      pressure_drop: toNumber(row.pressure_drop),
+
+      // Sim Metadata panel
+      cell_count: toNumber(row.cell_count),
 
       swept_variable: row.swept_variable ?? "",
       swept_range: row.swept_range ?? "",

@@ -42,15 +42,15 @@ const columns = [
     header: "Date",
     cell: (info) => formatDate(info.getValue()),
   }),
-  columnHelper.accessor("total_df", {
+  columnHelper.accessor("full_car_df", {
     header: "Total DF",
     cell: (info) => formatNumber(info.getValue(), { unit: "N" }),
   }),
-  columnHelper.accessor("total_drag", {
+  columnHelper.accessor("full_car_drag", {
     header: "Total Drag",
     cell: (info) => formatNumber(info.getValue(), { unit: "N" }),
   }),
-  columnHelper.accessor("CoP", {
+  columnHelper.accessor("full_car_CoP", {
     header: "CoP",
     cell: (info) => formatNumber(info.getValue(), { unit: "%" }),
   }),

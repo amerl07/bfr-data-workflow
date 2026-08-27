@@ -4,9 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function KpiCards({ row }: { row: SimRow }) {
   const items = [
-    { label: "Total Downforce", value: formatNumber(row.total_df, { unit: "N" }) },
-    { label: "Total Drag", value: formatNumber(row.total_drag, { unit: "N" }) },
-    { label: "CoP", value: formatNumber(row.CoP, { unit: "%" }) },
+    { label: "Total Downforce", value: formatNumber(row.full_car_df, { unit: "N" }) },
+    { label: "Total Drag", value: formatNumber(row.full_car_drag, { unit: "N" }) },
+    { label: "CoP", value: formatNumber(row.full_car_CoP, { unit: "%" }) },
     { label: "Cell Count", value: formatNumber(row.cell_count, { digits: 0 }) },
   ];
 

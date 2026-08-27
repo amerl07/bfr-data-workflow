@@ -30,8 +30,9 @@ export function ScatterTooltip({ row, x, y }: { row: SimRow; x: number; y: numbe
         </p>
         <p className="text-slate-400">{formatDate(row.date)}</p>
         <p className="mt-1 text-slate-600 dark:text-slate-300">
-          DF {formatNumber(row.total_df, { unit: "N" })} · Drag{" "}
-          {formatNumber(row.total_drag, { unit: "N" })} · CoP {formatNumber(row.CoP, { unit: "%" })}
+          DF {formatNumber(row.full_car_df, { unit: "N" })} · Drag{" "}
+          {formatNumber(row.full_car_drag, { unit: "N" })} · CoP{" "}
+          {formatNumber(row.full_car_CoP, { unit: "%" })}
         </p>
       </div>
     </div>

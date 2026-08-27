@@ -47,9 +47,9 @@ export function SimCard({ row }: { row: SimRow }) {
         </div>
         <p className="text-xs text-slate-400">{formatDate(row.date)}</p>
         <div className="mt-1 grid grid-cols-3 gap-2 text-xs">
-          <Metric label="Total DF" value={formatNumber(row.total_df, { unit: "N" })} />
-          <Metric label="Total Drag" value={formatNumber(row.total_drag, { unit: "N" })} />
-          <Metric label="CoP" value={formatNumber(row.CoP, { unit: "%" })} />
+          <Metric label="Total DF" value={formatNumber(row.full_car_df, { unit: "N" })} />
+          <Metric label="Total Drag" value={formatNumber(row.full_car_drag, { unit: "N" })} />
+          <Metric label="CoP" value={formatNumber(row.full_car_CoP, { unit: "%" })} />
         </div>
         <div className="mt-auto flex gap-2 pt-3">
           <Link

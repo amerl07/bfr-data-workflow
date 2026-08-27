@@ -41,7 +41,7 @@ export function AnalyticsView() {
   if (error) return <ErrorState message={(error as Error).message} />;
   if (!rows) return null;
 
-  const numeric = (key: "total_df" | "total_drag" | "CoP" | "cell_count") =>
+  const numeric = (key: "full_car_df" | "full_car_drag" | "full_car_CoP" | "cell_count") =>
     rows.map((r) => r[key]).filter((v): v is number => v !== null);
 
   return (
@@ -89,18 +89,18 @@ export function AnalyticsView() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle>Total DF (N)</CardTitle>
+              <CardTitle>Full Car DF (N)</CardTitle>
             </CardHeader>
             <CardContent>
-              <HistogramChart values={numeric("total_df")} />
+              <HistogramChart values={numeric("full_car_df")} />
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Total Drag (N)</CardTitle>
+              <CardTitle>Full Car Drag (N)</CardTitle>
             </CardHeader>
             <CardContent>
-              <HistogramChart values={numeric("total_drag")} />
+              <HistogramChart values={numeric("full_car_drag")} />
             </CardContent>
           </Card>
           <Card>
@@ -108,7 +108,7 @@ export function AnalyticsView() {
               <CardTitle>CoP (%)</CardTitle>
             </CardHeader>
             <CardContent>
-              <HistogramChart values={numeric("CoP")} />
+              <HistogramChart values={numeric("full_car_CoP")} />
             </CardContent>
           </Card>
           <Card>

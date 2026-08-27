@@ -3,8 +3,8 @@ import { normalizeSweepType, parseResultsCsv } from "@/lib/data";
 
 const HEADER =
   "job_name,post_zip_name,component,sweep_type,isolated_vs_fullcar,date,owner_initials," +
-  "raw_force_values,body_df,rw_drag,fw_df,rw_df,total_drag,total_df,ut_df,cell_count," +
-  "total_aero_df,wheel_df,whisker_df,CoP,CoP_meters,swept_variable,swept_range," +
+  "raw_force_values,body_df,rw_drag,fw_df,rw_df,full_car_drag,full_car_df,ut_df,cell_count," +
+  "wheel_df,full_car_CoP,full_car_CoP_meters,swept_variable,swept_range," +
   "scene_image_refs,source_drive_folder";
 
 function row(fields: Record<string, string>): string {
@@ -28,7 +28,7 @@ describe("parseResultsCsv", () => {
         job_name: "CD_UT_Outwash_Cornering_20260726",
         component: "UT",
         date: "20260726",
-        total_df: "-190.627172",
+        full_car_df: "-190.627172",
         fw_df: "", // blank -- CONTRIBUTING.md says this is "not an error", not zero
       }),
     ].join("\n");
@@ -36,7 +36,7 @@ describe("parseResultsCsv", () => {
     const rows = parseResultsCsv(csv);
     expect(rows).toHaveLength(1);
     expect(rows[0].job_name).toBe("CD_UT_Outwash_Cornering_20260726");
-    expect(rows[0].total_df).toBeCloseTo(-190.627172, 5);
+    expect(rows[0].full_car_df).toBeCloseTo(-190.627172, 5);
     expect(rows[0].fw_df).toBeNull();
     expect(rows[0].dateObj?.getUTCFullYear()).toBe(2026);
     expect(rows[0].dateObj?.getUTCMonth()).toBe(6); // July, 0-indexed

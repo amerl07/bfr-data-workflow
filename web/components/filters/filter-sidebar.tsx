@@ -122,21 +122,21 @@ export function FilterSidebar({ rows, filters, onChange }: FilterSidebarProps) {
         <RangeField
           label="Total Downforce"
           unit="N"
-          bounds={dataBounds(rows, "total_df")}
+          bounds={dataBounds(rows, "full_car_df")}
           value={filters.totalDfRange}
           onChange={(v) => set("totalDfRange", v)}
         />
         <RangeField
           label="Total Drag"
           unit="N"
-          bounds={dataBounds(rows, "total_drag")}
+          bounds={dataBounds(rows, "full_car_drag")}
           value={filters.totalDragRange}
           onChange={(v) => set("totalDragRange", v)}
         />
         <RangeField
           label="CoP"
           unit="%"
-          bounds={dataBounds(rows, "CoP")}
+          bounds={dataBounds(rows, "full_car_CoP")}
           value={filters.copRange}
           onChange={(v) => set("copRange", v)}
         />

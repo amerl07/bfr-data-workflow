@@ -57,9 +57,9 @@ export function applyFilters(rows: SimRow[], filters: FilterState): SimRow[] {
     }
     if (filters.dateFrom && (!row.date || row.date < filters.dateFrom)) return false;
     if (filters.dateTo && (!row.date || row.date > filters.dateTo)) return false;
-    if (!matchesRange(row.total_df, filters.totalDfRange)) return false;
-    if (!matchesRange(row.total_drag, filters.totalDragRange)) return false;
-    if (!matchesRange(row.CoP, filters.copRange)) return false;
+    if (!matchesRange(row.full_car_df, filters.totalDfRange)) return false;
+    if (!matchesRange(row.full_car_drag, filters.totalDragRange)) return false;
+    if (!matchesRange(row.full_car_CoP, filters.copRange)) return false;
     if (!matchesRange(row.cell_count, filters.cellCountRange)) return false;
     return true;
   });

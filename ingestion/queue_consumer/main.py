@@ -107,21 +107,117 @@ TOKEN_PATH = _MODULE_DIR / "token.json"
 # column (per 2026-07-29 decision: don't invent columns for undefined
 # labels). A known label simply absent from one report (e.g. an isolated
 # run with no "FW DF" line) leaves its column blank, not an error.
+#
+# CoP/CoP_meters (2026-08-27) used to be handled as dedicated
+# ForceReportData fields, populated by force_reports_parser.py itself --
+# unified into this generic mechanism instead, since they were never
+# actually special: just two more labels resolved via normalize_label.
+# They're still two distinct entries below (and two distinct columns),
+# since "CoP" and "CoP meters" are two distinct labels in the source file.
+#
+# 2026-08-27: "Total DF"/"Total Drag" map to full_car_df/full_car_drag, and
+# "CoP"/"CoP meters" map to full_car_CoP/full_car_CoP_meters (renamed on
+# the website side -- see web/lib/types.ts). "Total Aero DF" is back as
+# total_aero_df (website re-added it).
+#
+# NOTE: this dict's *values* must each be a name that appears somewhere in
+# RESULTS_FIELDS below, but (as of 2026-08-27) its *order* no longer
+# determines RESULTS_FIELDS' order -- RESULTS_FIELDS is spelled out
+# explicitly instead, to match data/results.csv's actual column order
+# (which mirrors web/lib/types.ts's panel layout, not insertion order in
+# this dict).
+#
+# Multiple keys CAN map to the same column (see below), one per confirmed
+# export-vintage spelling of the same quantity, e.g. "Total DF" (older) and
+# "Full Car DF" (newer) both -> full_car_df -- normalize_label only merges
+# underscore/case/whitespace variants of the *same* wording, not a genuine
+# reword like this. build_result_row's loop is written so a later key's
+# miss (None) never clobbers an earlier key's hit for the same column.
+#
+# 2026-08-27 (second pass): scanned every raw_force_values string already
+# in data/results.csv (30 real rows) plus docs/force_reports.txt for
+# confirmed label text -- added everything below that's unambiguous (same
+# unit across every occurrence checked). Left deliberately unmapped:
+# "RW Mounting DF/Drag" (no corresponding SimRow field exists), "Cl"/"Cd"
+# (distinct dimensionless quantities from ClA/CdA, not the same thing),
+# "EL8 DF/Drag" (no EL8 field defined -- only EL4-7 exist), and bare
+# "Full Car CoP" (genuinely ambiguous: one real row uses it as a duplicate
+# of "CoP Meters" [unit "m"], two others use it as the plain percentage
+# [no unit] -- handled by dedicated unit-aware code in build_result_row
+# instead of a flat mapping here, same as the CoP/CoP_meters unification's
+# original special case).
 FORCE_LABEL_COLUMNS = {
     "Body DF": "body_df",
     "RW Drag": "rw_drag",
     "FW DF": "fw_df",
     "RW DF": "rw_df",
-    "Total Drag": "total_drag",
-    "Total DF": "total_df",
+    "Total Drag": "full_car_drag",
+    "Full Car Drag": "full_car_drag",
+    "Total DF": "full_car_df",
+    "Full Car DF": "full_car_df",
     "UT DF": "ut_df",
     "Cell count": "cell_count",
     "Total Aero DF": "total_aero_df",
+    "Aero DF": "total_aero_df",
     "Wheel DF": "wheel_df",
     "Whisker DF": "whisker_df",
+    "CoP": "full_car_CoP",
+    "CoP meters": "full_car_CoP_meters",
+    "Body Drag": "body_drag",
+    "FW Drag": "fw_drag",
+    "UT Drag": "ut_drag",
+    "Wheel Drag": "wheel_drag",
+    "Endplate DF": "endplate_df",
+    "RW Endplate DF": "endplate_df",
+    "Endplate Drag": "endplate_drag",
+    "RW Endplate Drag": "endplate_drag",
+    "Swan Neck DF": "swan_neck_df",
+    "Swan Neck Drag": "swan_neck_dragf",
+    "Carbon Rod DF": "carbon_rod_df",
+    "Carbon Rod Drag": "carbon_rod_drag",
+    "EL4 DF": "EL4_df",
+    "RW EL4 DF": "EL4_df",
+    "EL5 DF": "EL5_df",
+    "RW EL5 DF": "EL5_df",
+    "EL6 DF": "EL6_df",
+    "EL7 DF": "EL7_df",
+    "RW EL7 DF": "EL7_df",
+    "EL4 Drag": "EL4_drag",
+    "RW EL4 Drag": "EL4_drag",
+    "EL5 Drag": "EL5_drag",
+    "RW EL5 Drag": "EL5_drag",
+    "EL6 Drag": "EL6_drag",
+    "EL7 Drag": "EL7_drag",
+    "RW EL7 Drag": "EL7_drag",
+    "Frontal Area": "frontal_area",
+    "RW Area": "RW_area",
+    "FW Area": "FW_area",
+    "UT Area": "UT_area",
+    "ClA": "ClA",
+    "CdA": "CdA",
+    "UT CoP": "UT_CoP_meters",
+    "CoP_Meters UT": "UT_CoP_meters",
+    "RW CoP": "RW_CoP_meters",
+    "CoP_Meters RW": "RW_CoP_meters",
+    "Radiator MFR": "radiator_MFR",
+    "Radiator MF Rate": "radiator_MFR",
+    "Mass Flow Rate": "radiator_MFR",
+    "Inlet MFA": "inlet_MF_averaged_pressure",
+    "Inlet MF Averaged Pressure": "inlet_MF_averaged_pressure",
+    "Inlet MFA Pressure": "inlet_MF_averaged_pressure",
+    "Outlet MFA": "outlet_MF_averaged_pressure",
+    "Outlet MF Averaged Pressure": "outlet_MF_averaged_pressure",
+    "Outlet MFA Pressure": "outlet_MF_averaged_pressure",
+    "Pressure Drop": "pressure_drop",
 }
 
 RESULTS_CSV_PATH = _MODULE_DIR.parent.parent / "data" / "results.csv"
+# Must match data/results.csv's actual header exactly (name AND order) --
+# append_result_row only ever appends using this list, it never rewrites
+# the header on disk. Mirrors web/lib/types.ts's SimRow field order
+# (2026-08-27). Most of the per-wing-element/area/radiator columns have no
+# FORCE_LABEL_COLUMNS entry yet (see that dict's comment) and so are always
+# blank for now -- not an error, just not wired up to a source label yet.
 RESULTS_FIELDS = [
     "job_name",
     "post_zip_name",
@@ -137,13 +233,61 @@ RESULTS_FIELDS = [
     # everything force_reports.txt has, verbatim, regardless of whether a
     # label made it into its own column below.
     "raw_force_values",
-    *FORCE_LABEL_COLUMNS.values(),
-    "CoP",
-    "CoP_meters",
+    # Downforce panel
+    "full_car_df",
+    "total_aero_df",
+    "body_df",
+    "fw_df",
+    "rw_df",
+    "ut_df",
+    "wheel_df",
+    "endplate_df",
+    "swan_neck_df",
+    "carbon_rod_df",
+    "EL4_df",
+    "EL5_df",
+    "EL6_df",
+    "EL7_df",
+    # Drag panel
+    "full_car_drag",
+    "body_drag",
+    "fw_drag",
+    "rw_drag",
+    "ut_drag",
+    "wheel_drag",
+    "endplate_drag",
+    "swan_neck_dragf",
+    "carbon_rod_drag",
+    "EL4_drag",
+    "EL5_drag",
+    "EL6_drag",
+    "EL7_drag",
+    # Area and Coefficients panel
+    "frontal_area",
+    "RW_area",
+    "FW_area",
+    "UT_area",
+    "ClA",
+    "CdA",
+    # Center of Pressure panel
+    "full_car_CoP",
+    "full_car_CoP_meters",
+    "UT_CoP_meters",
+    "RW_CoP_meters",
+    # Radiator panel
+    "radiator_MFR",
+    "inlet_MF_averaged_pressure",
+    "outlet_MF_averaged_pressure",
+    "pressure_drop",
+    # Sim Metadata panel
+    "cell_count",
     "swept_variable",
     "swept_range",
     "scene_image_refs",
     "source_drive_folder",
+    # Legacy -- no successor in the current schema, kept so existing
+    # historical data isn't discarded. No longer populated going forward.
+    "whisker_df",
 ]
 
 
@@ -432,22 +576,51 @@ def build_result_row(
         "date": sim_metadata.date,
         "owner_initials": sim_metadata.owner_initials,
         "raw_force_values": format_raw_force_values(force_data.raw_values, force_data.units),
-        "CoP": force_data.CoP,
-        "CoP_meters": force_data.CoP_meters,
         "swept_variable": force_data.swept_variable,
         "swept_range": force_data.swept_range,
         "scene_image_refs": format_scene_image_refs(file_names, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
     }
     # normalize_label so this matches regardless of which confirmed label
-    # spelling the source file used (underscore vs space, case) -- see
+    # spelling the source file used (underscore vs space, case, or -- as of
+    # 2026-08-27 -- an entirely different reworded spelling registered as a
+    # second FORCE_LABEL_COLUMNS key for the same column) -- see
     # force_reports_parser.py's module docstring, 2026-08-01 finding.
     normalized_raw_values = {
         force_reports_parser.normalize_label(label): value
         for label, value in force_data.raw_values.items()
     }
+    normalized_units = {
+        force_reports_parser.normalize_label(label): force_data.units.get(label, "")
+        for label in force_data.raw_values
+    }
     for label, column in FORCE_LABEL_COLUMNS.items():
-        row[column] = normalized_raw_values.get(force_reports_parser.normalize_label(label))
+        value = normalized_raw_values.get(force_reports_parser.normalize_label(label))
+        # Only overwrite if this label actually matched -- multiple labels
+        # can map to the same column (different export vintages' spelling
+        # of the same quantity), and only one of them will ever be present
+        # in a given row. Without this guard, a later key's miss would
+        # clobber an earlier key's real hit for the same column with None.
+        if value is not None:
+            row[column] = value
+        elif column not in row:
+            row[column] = None
+
+    # Bare "Full Car CoP" is genuinely ambiguous across export vintages --
+    # one real row uses it as a duplicate of "CoP Meters" (unit "m"), two
+    # others use it as the plain percentage (no unit) with no separate
+    # meters value at all. Resolved by that occurrence's own unit, and only
+    # as a fallback when the unambiguous "CoP"/"CoP meters" labels (above)
+    # are absent -- see FORCE_LABEL_COLUMNS' comment.
+    full_car_cop_value = normalized_raw_values.get("full car cop")
+    if full_car_cop_value is not None:
+        if normalized_units.get("full car cop") == "m":
+            if row.get("full_car_CoP_meters") is None:
+                row["full_car_CoP_meters"] = full_car_cop_value
+        else:
+            if row.get("full_car_CoP") is None:
+                row["full_car_CoP"] = full_car_cop_value
+
     return row
 
 

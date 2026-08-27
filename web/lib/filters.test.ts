@@ -35,8 +35,8 @@ describe("applyFilters", () => {
   });
 
   it("excludes rows with null values when a range filter is active", () => {
-    const withValue = makeRow({ total_df: -150 });
-    const withoutValue = makeRow({ total_df: null });
+    const withValue = makeRow({ full_car_df: -150 });
+    const withoutValue = makeRow({ full_car_df: null });
     const result = applyFilters([withValue, withoutValue], {
       ...EMPTY_FILTERS,
       totalDfRange: [-200, -100],
@@ -87,16 +87,16 @@ describe("distinctValues", () => {
 
 describe("dataBounds", () => {
   it("returns null when no rows have a value", () => {
-    expect(dataBounds([makeRow({ total_df: null })], "total_df")).toBeNull();
+    expect(dataBounds([makeRow({ full_car_df: null })], "full_car_df")).toBeNull();
   });
 
   it("returns [min, max] across rows, ignoring nulls", () => {
     const rows = [
-      makeRow({ total_df: -50 }),
-      makeRow({ total_df: -200 }),
-      makeRow({ total_df: null }),
+      makeRow({ full_car_df: -50 }),
+      makeRow({ full_car_df: -200 }),
+      makeRow({ full_car_df: null }),
     ];
-    expect(dataBounds(rows, "total_df")).toEqual([-200, -50]);
+    expect(dataBounds(rows, "full_car_df")).toEqual([-200, -50]);
   });
 
   it("returns [v, v] for a single row", () => {

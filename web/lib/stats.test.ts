@@ -77,20 +77,20 @@ describe("leaderboard", () => {
   });
 
   it("excludes rows with a null value", () => {
-    const rows = [makeRow({ total_df: -100 }), makeRow({ total_df: null })];
-    const result = leaderboard(rows, (r) => r.total_df, "desc");
+    const rows = [makeRow({ full_car_df: -100 }), makeRow({ full_car_df: null })];
+    const result = leaderboard(rows, (r) => r.full_car_df, "desc");
     expect(result).toHaveLength(1);
   });
 
   it("orders desc/asc and respects the limit", () => {
     const rows = [
-      makeRow({ total_df: -50 }),
-      makeRow({ total_df: -200 }),
-      makeRow({ total_df: -100 }),
+      makeRow({ full_car_df: -50 }),
+      makeRow({ full_car_df: -200 }),
+      makeRow({ full_car_df: -100 }),
     ];
-    const desc = leaderboard(rows, (r) => r.total_df, "desc", 2);
+    const desc = leaderboard(rows, (r) => r.full_car_df, "desc", 2);
     expect(desc.map((e) => e.value)).toEqual([-50, -100]);
-    const asc = leaderboard(rows, (r) => r.total_df, "asc", 1);
+    const asc = leaderboard(rows, (r) => r.full_car_df, "asc", 1);
     expect(asc.map((e) => e.value)).toEqual([-200]);
   });
 });

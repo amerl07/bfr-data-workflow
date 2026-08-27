@@ -21,8 +21,8 @@ export function PerformanceView() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const xKey = (searchParams.get("x") as NumericMetricKey) || "total_drag";
-  const yKey = (searchParams.get("y") as NumericMetricKey) || "total_df";
+  const xKey = (searchParams.get("x") as NumericMetricKey) || "full_car_drag";
+  const yKey = (searchParams.get("y") as NumericMetricKey) || "full_car_df";
   const colorKey = (searchParams.get("color") as CategoricalKey) || "component";
   const sizeKey = (searchParams.get("size") as SizeKey) || "cell_count";
 

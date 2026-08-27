@@ -53,15 +53,15 @@ describe("METRIC_MAP", () => {
 });
 
 describe("downforceToDragRatio", () => {
-  it("is null when total_drag is 0 (avoids divide-by-zero)", () => {
-    expect(downforceToDragRatio(makeRow({ total_df: -100, total_drag: 0 }))).toBeNull();
+  it("is null when full_car_drag is 0 (avoids divide-by-zero)", () => {
+    expect(downforceToDragRatio(makeRow({ full_car_df: -100, full_car_drag: 0 }))).toBeNull();
   });
 
   it("is null when either value is missing", () => {
-    expect(downforceToDragRatio(makeRow({ total_df: null }))).toBeNull();
+    expect(downforceToDragRatio(makeRow({ full_car_df: null }))).toBeNull();
   });
 
-  it("computes abs(total_df) / total_drag", () => {
-    expect(downforceToDragRatio(makeRow({ total_df: -190, total_drag: 95 }))).toBeCloseTo(2, 5);
+  it("computes abs(full_car_df) / full_car_drag", () => {
+    expect(downforceToDragRatio(makeRow({ full_car_df: -190, full_car_drag: 95 }))).toBeCloseTo(2, 5);
   });
 });

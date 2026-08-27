@@ -23,7 +23,7 @@ export function RelatedSimulations({ current, all }: { current: SimRow; all: Sim
                 {row.component} · {row.sweep_type} · {formatDate(row.date)}
               </p>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                Total DF: {formatNumber(row.total_df, { unit: "N" })}
+                Total DF: {formatNumber(row.full_car_df, { unit: "N" })}
               </p>
             </CardContent>
           </Card>

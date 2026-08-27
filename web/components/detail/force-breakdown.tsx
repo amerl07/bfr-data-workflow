@@ -1,7 +1,6 @@
 import type { SimRow } from "@/lib/types";
 import { METRICS } from "@/lib/metrics";
 import { formatNumber } from "@/lib/format";
-import { parseRawForceValues } from "@/lib/rawForceValues";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -13,31 +12,22 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-// No dedicated SimRow column for these -- per the "don't invent columns for
-// undefined labels" decision (ingestion/queue_consumer/main.py's
-// FORCE_LABEL_COLUMNS comment), they only ever live in raw_force_values.
-// Confirmed present in the second force_reports.txt sample (2026-08-01,
-// docs/"force_reports copy.txt") -- cooling/pressure figures, not forces.
-const COOLING_METRICS: { match: string; label: string }[] = [
-  { match: "radiator mfr", label: "Radiator MFR" },
-  { match: "inlet mfa", label: "Inlet MFA" },
-  { match: "outlet mfa", label: "Outlet MFA" },
-  { match: "pressure drop", label: "Pressure Drop" },
-];
-
 export function ForceBreakdown({ row }: { row: SimRow }) {
-  const aeroForces = METRICS.filter((m) => m.group === "aero-force");
-  const dragForces = METRICS.filter((m) => m.group === "drag");
-  const rawEntries = parseRawForceValues(row.raw_force_values);
+  const downforce = METRICS.filter((m) => m.group === "downforce");
+  const drag = METRICS.filter((m) => m.group === "drag");
+  const areaCoefficient = METRICS.filter((m) => m.group === "area-coefficient");
+  const cop = METRICS.filter((m) => m.group === "cop");
+  const radiator = METRICS.filter((m) => m.group === "radiator");
+  const mesh = METRICS.filter((m) => m.group === "mesh");
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader>
-          <CardTitle>Aerodynamic Forces</CardTitle>
+          <CardTitle>Downforce</CardTitle>
         </CardHeader>
         <CardContent>
-          {aeroForces.map((m) => (
+          {downforce.map((m) => (
             <Row key={m.key} label={m.label} value={formatNumber(row[m.key], { unit: m.unit })} />
           ))}
         </CardContent>
@@ -47,7 +37,17 @@ export function ForceBreakdown({ row }: { row: SimRow }) {
           <CardTitle>Drag</CardTitle>
         </CardHeader>
         <CardContent>
-          {dragForces.map((m) => (
+          {drag.map((m) => (
+            <Row key={m.key} label={m.label} value={formatNumber(row[m.key], { unit: m.unit })} />
+          ))}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Area and Coefficients</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {areaCoefficient.map((m) => (
             <Row key={m.key} label={m.label} value={formatNumber(row[m.key], { unit: m.unit })} />
           ))}
         </CardContent>
@@ -57,25 +57,29 @@ export function ForceBreakdown({ row }: { row: SimRow }) {
           <CardTitle>Center of Pressure</CardTitle>
         </CardHeader>
         <CardContent>
-          <Row label="CoP (%)" value={formatNumber(row.CoP, { unit: "%" })} />
-          <Row label="CoP (m)" value={formatNumber(row.CoP_meters, { unit: "m" })} />
+          {cop.map((m) => (
+            <Row key={m.key} label={m.label} value={formatNumber(row[m.key], { unit: m.unit })} />
+          ))}
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Cooling &amp; Pressure</CardTitle>
+          <CardTitle>Radiator</CardTitle>
         </CardHeader>
         <CardContent>
-          {COOLING_METRICS.map((m) => {
-            const entry = rawEntries.get(m.match);
-            return (
-              <Row
-                key={m.match}
-                label={m.label}
-                value={formatNumber(entry?.value ?? null, { unit: entry?.unit })}
-              />
-            );
-          })}
+          {radiator.map((m) => (
+            <Row key={m.key} label={m.label} value={formatNumber(row[m.key], { unit: m.unit })} />
+          ))}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Sim Metadata</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {mesh.map((m) => (
+            <Row key={m.key} label={m.label} value={formatNumber(row[m.key], { unit: m.unit })} />
+          ))}
         </CardContent>
       </Card>
     </div>
