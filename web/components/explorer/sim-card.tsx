@@ -2,15 +2,24 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ImageOff } from "lucide-react";
+import { ImageOff, Star } from "lucide-react";
 import type { SimRow } from "@/lib/types";
 import { driveThumbnailUrl } from "@/lib/drive";
 import { formatDate, formatNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 
-export function SimCard({ row }: { row: SimRow }) {
+export function SimCard({
+  row,
+  starred,
+  onToggleStar,
+}: {
+  row: SimRow;
+  starred: boolean;
+  onToggleStar: (jobName: string) => void;
+}) {
   const heroRef = row.scene_image_refs[0];
   const thumb = heroRef ? driveThumbnailUrl(heroRef) : null;
   const [imgError, setImgError] = useState(false);
@@ -64,6 +73,15 @@ export function SimCard({ row }: { row: SimRow }) {
           >
             Compare
           </Link>
+          <button
+            type="button"
+            aria-label={starred ? "Unstar this simulation" : "Star this simulation"}
+            aria-pressed={starred}
+            onClick={() => onToggleStar(row.job_name)}
+            className={buttonVariants({ variant: "outline", size: "sm", className: "px-2.5" })}
+          >
+            <Star className={cn("h-4 w-4", starred && "fill-yellow-400 text-yellow-400")} />
+          </button>
         </div>
       </CardContent>
     </Card>

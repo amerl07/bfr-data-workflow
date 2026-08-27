@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import type { SimRow } from "@/lib/types";
 import {
   EMPTY_FILTERS,
@@ -9,8 +9,10 @@ import {
   isFiltersEmpty,
   type FilterState,
 } from "@/lib/filters";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { RangeField } from "@/components/filters/range-field";
 
@@ -27,9 +29,19 @@ interface FilterSidebarProps {
   rows: SimRow[];
   filters: FilterState;
   onChange: (next: FilterState) => void;
+  /** Only rendered when both starred props are provided -- e.g. the
+   * Performance page reuses this sidebar without a starring feature. */
+  starredOnly?: boolean;
+  onStarredOnlyChange?: (next: boolean) => void;
 }
 
-export function FilterSidebar({ rows, filters, onChange }: FilterSidebarProps) {
+export function FilterSidebar({
+  rows,
+  filters,
+  onChange,
+  starredOnly,
+  onStarredOnlyChange,
+}: FilterSidebarProps) {
   const components = distinctValues(rows, "component");
   const sweepTypes = distinctValues(rows, "sweep_type");
   const simTypes = distinctValues(rows, "isolated_vs_fullcar");
@@ -50,6 +62,22 @@ export function FilterSidebar({ rows, filters, onChange }: FilterSidebarProps) {
           </Button>
         )}
       </div>
+
+      {onStarredOnlyChange && (
+        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+          <Checkbox
+            checked={!!starredOnly}
+            onCheckedChange={(v) => onStarredOnlyChange(!!v)}
+          />
+          <Star
+            className={cn(
+              "h-4 w-4",
+              starredOnly && "fill-yellow-400 text-yellow-400",
+            )}
+          />
+          Starred only
+        </label>
+      )}
 
       <div>
         <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
