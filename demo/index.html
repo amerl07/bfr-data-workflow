@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BFR Simulation Database — Yumo Liu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F2F4F6;
+    --panel: #FFFFFF;
+    --panel-line: #DDE2E7;
+    --text: #14181D;
+    --text-dim: #5B6672;
+    --cyan: #1C7F96;
+    --amber: #C1552B;
+    --line: #DDE2E7;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    line-height: 1.55;
+  }
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 0 28px;
+  }
+
+  /* ---- Header / hero ---- */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 56px 0 36px;
+  }
+  .kicker {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
+  }
+  h1 {
+    font-size: 40px;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 0 0 16px;
+    max-width: 720px;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--text-dim);
+    max-width: 620px;
+    margin: 0 0 36px;
+  }
+  .byline {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .byline span strong { color: var(--text); font-weight: 500; }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 40px;
+  }
+  .stat {
+    background: var(--panel);
+    padding: 20px 18px;
+  }
+  .stat .num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 24px;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+  .stat .label {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* ---- Sections ---- */
+  section.step {
+    padding: 72px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  section.step:last-of-type { border-bottom: none; }
+
+  .step-head {
+    display: flex;
+    gap: 20px;
+    align-items: baseline;
+    margin-bottom: 18px;
+  }
+  .step-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    color: var(--amber);
+    flex-shrink: 0;
+  }
+  .step h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+  .step p {
+    font-size: 15.5px;
+    color: var(--text-dim);
+    max-width: 640px;
+    margin: 0 0 8px;
+  }
+  .step p.role {
+    color: var(--text);
+  }
+  .step p.role .mono {
+    color: var(--cyan);
+    font-size: 13px;
+  }
+
+  figure {
+    margin: 28px 0 0;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  figure img,
+  figure video {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  figcaption {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    padding: 10px 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .two-up {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    margin-top: 28px;
+  }
+  .two-up figure { margin-top: 0; }
+
+  @media (max-width: 720px) {
+    .two-up { grid-template-columns: 1fr; }
+    .stat-row { grid-template-columns: 1fr; }
+    h1 { font-size: 30px; }
+  }
+
+  /* ---- Footer ---- */
+  footer {
+    padding: 56px 0 80px;
+  }
+  footer p {
+    font-size: 14.5px;
+    color: var(--text-dim);
+    max-width: 620px;
+  }
+  footer .mono {
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="kicker mono">FSAE AERODYNAMICS: INTERNAL TOOLING</div>
+    <h1>A shared simulation database for a team that outgrew its spreadsheets</h1>
+    <p class="lede">Berkeley Formula Racing's aero subteam was tracking CFD results across individual members' folders, with no shared naming, no way to compare runs, and no way to find a scene render without asking around. This is the tool that replaced that.</p>
+    <div class="byline">
+      <span>Directed &amp; built by <strong>Yumo Liu</strong></span>
+      <span>Aerodynamics Engineer, Berkeley Formula Racing</span>
+      <span>June 2026 &ndash; Present</span>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="num">33</div><div class="label">simulations tracked</div></div>
+      <div class="stat"><div class="num">6</div><div class="label">contributing teammates</div></div>
+      <div class="stat"><div class="num">2</div><div class="label">sweep types</div></div>
+    </div>
+  </header>
+
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">01</div>
+      <h2>Explorer: every run, one place, filterable</h2>
+    </div>
+    <p class="role">What it replaced: digging through individual Drive folders to find a specific run, with no consistent naming to search by.</p>
+    <p>Every simulation lands here automatically once it's uploaded. Component, sweep type, owner, and performance metrics are extracted and filterable, with the scene render shown up front so teammates recognize a run at a glance.</p>
+    <figure>
+      <img src="assets/01_explorer.jpg" alt="Explorer view showing filterable grid of CFD simulations">
+      <figcaption>Explorer: 33 of 33 simulations, filterable by component, sweep type, owner, and performance range</figcaption>
+    </figure>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">02</div>
+      <h2>Compare: two runs, side by side, in seconds</h2>
+    </div>
+    <p class="role">What it replaced: opening two separate result files and manually cross-referencing numbers.</p>
+    <p>Metadata and every performance metric are laid out delta-first, so green/red coloring shows which run won on each axis without doing the subtraction yourself. Scene galleries for both runs sit underneath, with an overlay tool for direct visual comparison.</p>
+    <figure>
+      <img src="assets/02_compare_metadata.jpg" alt="Compare view showing metadata and performance delta table between two simulation runs">
+      <figcaption>Compare: metadata and performance deltas between a rear-wing bend baseline and its revision</figcaption>
+    </figure>
+    <figure>
+      <img src="assets/03_scene_galleries.jpg" alt="Scene galleries showing CFD renders side by side for two runs">
+      <figcaption>Scene galleries: every render for both runs, searchable by name, ready to select for overlay</figcaption>
+    </figure>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">03</div>
+      <h2>Overlay: the feature teammates actually wanted</h2>
+    </div>
+    <p class="role">Added after direct teammate feedback: "I want to see exactly what changed between these two scenes, not two images side by side."</p>
+    <p>Select a render from each run and the tool overlays them directly. This is what now gets pulled up live in design reviews instead of a folder of exported screenshots.</p>
+    <figure>
+      <video src="assets/07_overlay_demo.mp4" autoplay loop muted playsinline aria-label="Animated demo of the scene overlay comparison tool blending two CFD renders"></video>
+      <figcaption>Scene overlay: blending two runs' renders to isolate exactly what changed</figcaption>
+    </figure>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">04</div>
+      <h2>Performance: where trade-offs become visible</h2>
+    </div>
+    <p class="role">What it replaced: no way to see the whole design space at once, only one run at a time.</p>
+    <p>Any two metrics can be plotted against each other across every run in the dataset, colored by owner, sized by a third variable. This is where a downforce/drag trade-off across 10+ configurations actually becomes visible instead of implied.</p>
+    <figure>
+      <img src="assets/04_performance.jpg" alt="Scatter plot comparing total drag against total downforce across simulation runs">
+      <figcaption>Performance: Total Drag vs. Total DF across undertray configurations, colored by owner</figcaption>
+    </figure>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">05</div>
+      <h2>Analytics: the team's activity, not just one run</h2>
+    </div>
+    <p class="role">What it replaced: no visibility into who was running what, or whether coverage across components was balanced.</p>
+    <p>A rolling view of team throughput: which components are getting the most simulation attention, who's contributing, and how activity trends across the season. Below that, a correlation matrix and auto-surfaced leaderboards (highest downforce, best drag ratio, lowest cell count) mean nobody has to sort a spreadsheet to find the best-performing geometry.</p>
+    <div class="two-up">
+      <figure>
+        <img src="assets/05_analytics_overview.jpg" alt="Analytics dashboard showing team summary stats and simulation activity over time">
+        <figcaption>Team overview: component distribution, owner activity, simulation cadence</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/06_analytics_correlations.jpg" alt="Correlation matrix and top-performer leaderboards for simulation metrics">
+        <figcaption>Correlation matrix &amp; auto-ranked top performers</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <footer>
+    <p>This is an internal tool built for Berkeley Formula Racing's aerodynamics subteam, not a commercial product. I identified the workflow gap, scoped the data schema and naming convention, and directed development of the ingestion pipeline and this web app, iterating on it based on ongoing teammate feedback.</p>
+    <p class="mono">Yumo Liu &middot; liuyumo422@gmail.com &middot; linkedin.com/in/liu-yumo</p>
+  </footer>
+</div>
+
+</body>
+</html>
