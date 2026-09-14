@@ -15,10 +15,9 @@ yet, and the drive-watcher and `ingestion/parsers/` code are built to
 assume this -- they should not try to generically handle arbitrary file
 types ahead of need. Support for other artifact types -- e.g. a CSV-based
 Bayesian sweep trials log (see the open question in §5) -- is a known future
-extension, not something to build out now. Batch folders (grouping several
-post jobs together) are also out of scope right now -- `folder_name_parser.py`
-is still a stub -- so post.zip is normally dropped loose in the watched
-folder, not nested inside one.
+extension, not something to build out now. A post job can still be dropped
+loose (no batch folder) as before, or nested inside a named batch/sweep
+folder -- see §1b for when and how to use one.
 
 ## 1. Source file naming convention
 
@@ -85,6 +84,58 @@ live spellings, everything else is passed through as-is.
 - Initials are fixed per person, documented centrally (see §6 below).
 - Swept parameter ranges are *not* encoded in the name -- pulled from
   `force_reports.txt` content instead, **if present** (see open questions).
+
+## 1b. Batch/sweep folder naming convention
+
+Decided 2026-09-13, for the case where several sims are one run each of the
+same parameter (e.g. mesh base size) at different values, and you want
+`data/results.csv` and the web app to know they're a batch rather than
+treating them as unrelated one-offs. Enclose them in a Drive folder, named
+with the exact same five-token shape as §1, but with `DESCRIPTION` naming
+the **variable being swept** instead of one value of it:
+
+```
+{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}
+```
+
+**Example:** folder `YL_FC_MeshBase_Straight_20260913`, containing
+`post_YL_FC_MeshBase30mm_Straight_20260913.zip`,
+`post_YL_FC_MeshBase35mm_Straight_20260913.zip`,
+`post_YL_FC_MeshBase40mm_Straight_20260913.zip`, ... -- each file's own
+`DESCRIPTION` is still `{SWEPTVARIABLE}{VALUE}{UNIT}` per §1, just with a
+number+unit suffix appended (`ingestion/parsers/sim_filename_parser.py::extract_swept_value`
+splits it back out, matched against the folder's declared `SWEPTVARIABLE`).
+Drop it anywhere directly under the watched Drive folder, same as a loose
+post.zip -- `ingestion/drive-watcher/BatchFolderDetector.gs` detects it
+automatically (no drive-watcher changes needed; it already treats any
+folder name that doesn't start with `post_` as a batch folder).
+
+**Why the same shape as §1, not a new syntax:** nothing new to learn, and
+`ingestion/parsers/folder_name_parser.py` reuses the same regex/sweep-type
+normalization as `sim_filename_parser.py`.
+
+**What this populates in `data/results.csv`:**
+- `swept_variable` -- the folder's `SWEPTVARIABLE` token, e.g. `MeshBase`.
+- `swept_value` / `swept_value_unit` -- this sim's own numeric value/unit,
+  from its filename (e.g. `30` / `mm`).
+- `isolated_vs_fullcar` -- now genuinely cross-checked against the folder's
+  own `COMPONENT` token (the `CONFLICT: ...` mechanism in
+  `reconcile_isolated_vs_fullcar`, previously dormant since batch folders
+  were unused, is live again).
+- `swept_range` -- **deliberately NOT populated here.** Computing a batch's
+  min/max at ingestion time would go stale as later sims in the same batch
+  land afterward. Instead it's computed live in the web app
+  (`web/lib/batch.ts`) from every row sharing `source_drive_folder`, and
+  shown on Simulation Detail's "Sweep Information" card, which also lists
+  every sibling in the batch there -- that's the "batch" indicator.
+
+A file inside a batch folder whose `DESCRIPTION` doesn't actually start
+with the folder's `SWEPTVARIABLE` (typo, or an unrelated one-off dropped in
+the same folder) doesn't block ingestion -- it still gets `swept_variable`
+from the folder, just no `swept_value` (same "parse whatever matches,
+don't invent/reject" rule as §1). A batch folder name that doesn't match
+the convention above, though, is a real error (`error: ...` in the queue),
+not silently ignored.
 
 ## 2. post.zip file categories (summary)
 
@@ -177,7 +228,9 @@ One row per `post.zip` processed. See
 | `body_df`, `rw_drag`, `fw_df`, `rw_df`, `total_drag`, `total_df`, `ut_df`, `cell_count`, `total_aero_df`, `wheel_df`, `whisker_df` | Decided 2026-07-29: each force label confirmed present in every real `force_reports.txt` sample so far gets its own numeric column too (`ingestion/queue_consumer/main.py::FORCE_LABEL_COLUMNS`), for querying/sorting without re-parsing `raw_force_values`. A label not in this fixed set (a future/different export shape) stays in `raw_force_values` only -- no column gets invented for it. A known label simply absent from one report (e.g. an isolated run with no `FW DF` line) leaves its column blank, not an error. No CL/CD column -- computing a real coefficient needs reference constants (velocity, area, air density) not present in the file, and getting those out of the sims is hard for this team right now. Values are exactly as the file reports them, including its own "half-car, undoubled" convention -- not doubled to a full-car representation. |
 | `CoP` | `force_reports.txt`'s unitless `CoP` label -- a percentage (§2.5) |
 | `CoP_meters` | `force_reports.txt`'s separate `CoP meters` label -- absolute distance in meters (§2.5); kept alongside `CoP` rather than picking one |
-| `swept_variable`, `swept_range` | **Confirmed absent** from `force_reports.txt` (a single-run export has no sweep info at all) -- would need to come from elsewhere, e.g. the sweep tool's own trials log (Proposal Outline §4.3), if captured at all |
+| `swept_variable` | **Confirmed absent** from `force_reports.txt`. Populated from the enclosing batch/sweep folder's name when the post.zip was dropped inside one (§1b), blank otherwise |
+| `swept_range` | Deliberately left blank at ingestion time (would go stale mid-batch) -- computed live in the web app from sibling rows' `swept_value` instead, see §1b |
+| `swept_value`, `swept_value_unit` | This sim's own value/unit along `swept_variable`, parsed from its own filename (§1b). Blank when there's no batch folder, or the filename doesn't encode a value along the folder's declared variable |
 | `scene_image_refs` | `;`-joined Drive view links, one per scene image (§3) |
 | `source_drive_folder` | Path/link to the originating batch folder, blank when the post.zip was dropped loose (no batch folder) |
 

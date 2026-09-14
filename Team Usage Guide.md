@@ -23,6 +23,12 @@ https://github.com/amerl07/bfr-data-workflow.
 3. **Drop `post_<job_name>.zip`** into the shared watched Drive folder:
    https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
    You can drop it loose in that folder — no need to create a subfolder.
+   **Running a sweep** (several sims, one parameter changing between them —
+   e.g. mesh base size at 30mm/35mm/40mm) Enclose them in a folder named
+   `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` (e.g.
+   `YL_FC_MeshBase_Straight_20260913`) instead of dropping them loose — see
+   `CONTRIBUTING.md` §1b. The web app will then show them together as a
+   batch on each sim's detail page.
 4. **Detection is automatic**, usually within about a minute. A row
    appears in the Processing Queue sheet (see §3) with status `pending`.
 5. **Processing is also automatic** from there — it downloads your

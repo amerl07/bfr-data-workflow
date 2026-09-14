@@ -32,7 +32,7 @@ post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip.
 
 import re
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Tuple
 
 
 @dataclass
@@ -70,14 +70,46 @@ _SWEEP_TYPE_ALIASES = {
 }
 
 
-def _normalize_sweep_type(raw_sweep_type: str) -> str:
+def normalize_sweep_type(raw_sweep_type: str) -> str:
     """Case-insensitive canonicalization for the two sweep types confirmed
     to have two live spellings (CORNER/CORNERING, STRAIGHT/STRAIGHTLINE --
     see _SWEEP_TYPE_ALIASES and the module docstring). Any other value
     (VEL, YAW, RH, AOA, COMBO, or an undefined code) is returned exactly as
     written -- not case-folded, not aliased.
+
+    Public (not module-private) since ingestion/parsers/folder_name_parser.py
+    reuses it -- batch/sweep folder names share this same sweep-type token.
     """
     return _SWEEP_TYPE_ALIASES.get(raw_sweep_type.upper(), raw_sweep_type)
+
+
+# A batch/sweep-folder DESCRIPTION token (e.g. "MeshBase30mm") is this
+# batch's declared swept-variable name (e.g. "MeshBase", from
+# folder_name_parser.py) immediately followed by this particular sim's
+# numeric value and an optional unit -- no separator, matching how the
+# filename convention packs every field into plain alnum tokens.
+_SWEPT_VALUE_SUFFIX_PATTERN = re.compile(r"^(?P<value>\d+(?:\.\d+)?)(?P<unit>[A-Za-z]*)$")
+
+
+def extract_swept_value(description: str, swept_variable: str) -> Optional[Tuple[float, str]]:
+    """Splits a sim's own DESCRIPTION token into (value, unit) given the
+    enclosing batch folder's declared swept_variable name, e.g.
+    `extract_swept_value("MeshBase30mm", "MeshBase")` -> `(30.0, "mm")`.
+
+    Returns None -- not a raise -- when `description` doesn't start with
+    `swept_variable` followed by a bare number(+unit), same "parse whatever
+    matches, don't invent/reject" spirit as sweep-type/component codes
+    above: a sim dropped in a batch folder whose description doesn't
+    actually encode a value along that folder's variable (typo, or just an
+    unrelated one-off file) shouldn't block ingestion, it just doesn't get
+    a swept_value.
+    """
+    if not description.startswith(swept_variable):
+        return None
+    match = _SWEPT_VALUE_SUFFIX_PATTERN.match(description[len(swept_variable) :])
+    if not match:
+        return None
+    return float(match.group("value")), match.group("unit")
 
 
 def parse_sim_filename(filename: str) -> SimFileMetadata:
@@ -117,7 +149,7 @@ def _parse_job_name(raw_name: str, job_name: str) -> SimFileMetadata:
         owner_initials=match.group("initials"),
         component=match.group("component"),
         description=match.group("description"),
-        sweep_type=_normalize_sweep_type(match.group("sweep_type")),
+        sweep_type=normalize_sweep_type(match.group("sweep_type")),
         date=match.group("date"),
         is_full_car=match.group("component") == _FULL_CAR_COMPONENT,
         job_name=job_name,
@@ -134,17 +166,17 @@ def reconcile_isolated_vs_fullcar(
     batch-folder convention and a separate Sabalcore-filename ISO_ prefix --
     that could disagree. The filename convention (see this module's
     docstring) now encodes it directly via the COMPONENT token
-    (SimFileMetadata.is_full_car), and the Drive batch-folder layer is out
-    of current scope (folder_name_parser is still a stub, batch folders
-    aren't used) -- so `folder_is_full_car` is normally None and this just
-    returns the filename's signal. Kept as a two-signal reconciliation
-    (rather than simplified to filename-only) so a real batch-folder signal,
-    if that ever comes back into scope, still gets cross-checked and
-    disagreements surfaced rather than silently overridden.
+    (SimFileMetadata.is_full_car). `folder_is_full_car` is None whenever
+    there's no batch folder (a post.zip dropped loose -- still the common
+    case), in which case this just returns the filename's signal. When a
+    sim *is* inside a batch/sweep folder (see folder_name_parser.py, no
+    longer a stub as of the batch-sweep-folder support), the folder's own
+    COMPONENT token is cross-checked here too, surfacing a `CONFLICT: ...`
+    on disagreement rather than silently picking one.
 
     @param folder_is_full_car: True/False if a Drive batch folder's
         component code is available to check against, None if there's no
-        batch folder (the common case right now).
+        batch folder (a post.zip dropped loose).
     @param sim_is_full_car: SimFileMetadata.is_full_car from the post.zip
         filename.
     """

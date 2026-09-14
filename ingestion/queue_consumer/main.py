@@ -9,15 +9,19 @@ case, or just listing children for the folder case, so that either way every
 scene image ends up with a real Drive file id (see CONTRIBUTING.md §4's
 "link only" gap). That part runs regardless of parser status.
 
-What still doesn't fully run: sim_filename_parser is implemented;
-force_reports_parser now parses the real (confirmed) format too, but
-deliberately doesn't populate CL/CD (no reference constants
-to compute a coefficient from raw Newtons -- see its docstring) or
-swept_variable/swept_range (confirmed absent from the format). Blocked past
-that point on reconcile_isolated_vs_fullcar and, when a batch folder is
-involved, folder_name_parser -- still stubs. This consumer treats a stub's
-NotImplementedError as an expected, not-yet-unblocked state: it marks the
-row "blocked: <reason>" and moves on, rather than faking a result row.
+sim_filename_parser and folder_name_parser (2026-09-13 -- batch/sweep-folder
+support, see CONTRIBUTING.md §1b) are both implemented; force_reports_parser
+now parses the real (confirmed) format too, but deliberately doesn't
+populate CL/CD (no reference constants to compute a coefficient from raw
+Newtons -- see its docstring) or swept_variable/swept_range (confirmed
+absent from the format -- swept_variable/swept_value come from
+folder_name_parser + sim_filename_parser instead when a batch/sweep folder
+is involved, see build_result_row). A stub's NotImplementedError (there are
+none left as of this writing, but the mechanism stays for any future one) is
+treated as an expected, not-yet-unblocked state: it marks the row
+"blocked: <reason>" and moves on, rather than faking a result row. A real
+parse failure (e.g. a folder or file name that just doesn't match its
+convention) raises ValueError/etc. instead and is marked "error: <reason>".
 
 Auth -- see get_credentials(). Both local runs and the scheduled GitHub
 Actions run use the *same* OAuth installed-app credentials (a real Google
@@ -283,6 +287,16 @@ RESULTS_FIELDS = [
     "cell_count",
     "swept_variable",
     "swept_range",
+    # This sim's own value/unit along swept_variable (e.g. 30.0 / "mm"),
+    # parsed from its filename's DESCRIPTION token -- only populated when
+    # the post job is inside a batch/sweep folder (see folder_name_parser.py
+    # and sim_filename_parser.extract_swept_value). swept_range above is
+    # deliberately NOT derived from these at ingestion time -- see
+    # CONTRIBUTING.md §1b: doing so here would go stale as later sims in
+    # the same batch land, so it's computed live in the web app instead
+    # (web/lib/batch.ts) from all rows sharing source_drive_folder.
+    "swept_value",
+    "swept_value_unit",
     "scene_image_refs",
     "source_drive_folder",
     # Legacy -- no successor in the current schema, kept so existing
@@ -541,9 +555,8 @@ def build_result_row(
 ):
     """Runs the materialized post job through ingestion/parsers/ and
     assembles a data/results.csv row per post_zip_file_format_spec.md §7
-    (as amended -- see RESULTS_FIELDS' raw_force_values comment). Any
-    parser call below still backed by a stub (folder_name_parser, when a
-    batch folder is involved) raises NotImplementedError -- see
+    (as amended -- see RESULTS_FIELDS' raw_force_values comment). A folder
+    or file name that doesn't match its convention raises ValueError -- see
     process_row's handling of that.
     """
     sim_metadata = sim_filename_parser.parse_post_zip_filename(file_name)
@@ -559,25 +572,43 @@ def build_result_row(
         sim_metadata.is_full_car,
     )
 
+    # swept_variable/value: force_reports.txt never has these (see
+    # force_reports_parser's docstring), so folder_metadata -- when this
+    # post job is inside a batch/sweep folder -- is the only source.
+    # swept_value is this sim's own value along that variable, pulled from
+    # its own filename's DESCRIPTION token (e.g. "MeshBase30mm" against a
+    # folder-declared "MeshBase" -> 30.0, "mm"); left blank (not an error)
+    # if the description doesn't actually encode a value along the folder's
+    # variable, same "don't invent" spirit as elsewhere in this module.
+    swept_variable = folder_metadata.swept_variable if folder_metadata else force_data.swept_variable
+    swept_value = None
+    swept_value_unit = ""
+    if folder_metadata:
+        extracted = sim_filename_parser.extract_swept_value(
+            sim_metadata.description, folder_metadata.swept_variable
+        )
+        if extracted:
+            swept_value, swept_value_unit = extracted
+
     row = {
         "job_name": sim_metadata.job_name,
         "post_zip_name": file_name,
         # Filename-derived ({INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}
         # _{YYYYMMDD}, Proposal Outline §5), not folder_metadata --
-        # component/sweep_type now come from the post.zip name itself,
-        # since a batch folder (the only other source) is out of current
-        # scope and folder_name_parser is still a stub. If folder_metadata
-        # is ever populated again, cross-checking it against these would
-        # belong here, same spirit as isolated_vs_fullcar's reconciliation
-        # above -- not done yet.
+        # component/sweep_type still come from the post.zip name itself even
+        # when a batch folder is present, matching isolated_vs_fullcar's
+        # "filename is authoritative, folder is cross-checked" treatment
+        # above rather than being overridden by it.
         "component": sim_metadata.component,
         "sweep_type": sim_metadata.sweep_type,
         "isolated_vs_fullcar": isolated_vs_fullcar,
         "date": sim_metadata.date,
         "owner_initials": sim_metadata.owner_initials,
         "raw_force_values": format_raw_force_values(force_data.raw_values, force_data.units),
-        "swept_variable": force_data.swept_variable,
+        "swept_variable": swept_variable,
         "swept_range": force_data.swept_range,
+        "swept_value": swept_value,
+        "swept_value_unit": swept_value_unit,
         "scene_image_refs": format_scene_image_refs(file_names, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
     }

@@ -131,6 +131,8 @@ export function parseResultsCsv(csvText: string): SimRow[] {
 
       swept_variable: row.swept_variable ?? "",
       swept_range: row.swept_range ?? "",
+      swept_value: toNumber(row.swept_value),
+      swept_value_unit: row.swept_value_unit ?? "",
 
       scene_image_refs: splitRefs(row.scene_image_refs),
       source_drive_folder: row.source_drive_folder ?? "",

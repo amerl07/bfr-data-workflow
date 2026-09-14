@@ -69,7 +69,15 @@ export interface SimRow {
   // Sim Metadata panel
   cell_count: number | null;
   swept_variable: string;
+  /** Deprecated input-side (ingestion no longer populates this -- see
+   * lib/batch.ts, which computes a batch's range live from sibling rows'
+   * swept_value instead). Kept for back-compat with any hand-added rows
+   * that still have it filled in. */
   swept_range: string;
+  /** This row's own value along `swept_variable`, when it's part of a
+   * batch/sweep folder (blank source_drive_folder otherwise). */
+  swept_value: number | null;
+  swept_value_unit: string;
 
   /** Split on `;`, empty entries dropped. */
   scene_image_refs: string[];
@@ -125,4 +133,5 @@ export type NumericMetricKey =
   | "outlet_MF_averaged_pressure"
   | "pressure_drop"
   // Sim Metadata panel
-  | "cell_count";
+  | "cell_count"
+  | "swept_value";

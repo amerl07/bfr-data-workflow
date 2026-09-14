@@ -4,7 +4,7 @@ import { normalizeSweepType, parseResultsCsv } from "@/lib/data";
 const HEADER =
   "job_name,post_zip_name,component,sweep_type,isolated_vs_fullcar,date,owner_initials," +
   "raw_force_values,body_df,rw_drag,fw_df,rw_df,full_car_drag,full_car_df,ut_df,cell_count," +
-  "wheel_df,full_car_CoP,full_car_CoP_meters,swept_variable,swept_range," +
+  "wheel_df,full_car_CoP,full_car_CoP_meters,swept_variable,swept_range,swept_value,swept_value_unit," +
   "scene_image_refs,source_drive_folder";
 
 function row(fields: Record<string, string>): string {
@@ -41,6 +41,19 @@ describe("parseResultsCsv", () => {
     expect(rows[0].dateObj?.getUTCFullYear()).toBe(2026);
     expect(rows[0].dateObj?.getUTCMonth()).toBe(6); // July, 0-indexed
     expect(rows[0].dateObj?.getUTCDate()).toBe(26);
+  });
+
+  it("parses swept_value as a number and coerces a blank swept_value to null", () => {
+    const csv = [
+      HEADER,
+      row({ job_name: "A", swept_variable: "MeshBase", swept_value: "30", swept_value_unit: "mm" }),
+      row({ job_name: "B" }),
+    ].join("\n");
+    const rows = parseResultsCsv(csv);
+    expect(rows[0].swept_value).toBe(30);
+    expect(rows[0].swept_value_unit).toBe("mm");
+    expect(rows[1].swept_value).toBeNull();
+    expect(rows[1].swept_value_unit).toBe("");
   });
 
   it("splits scene_image_refs on ';' and drops blank entries", () => {

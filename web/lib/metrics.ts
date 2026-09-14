@@ -6,7 +6,7 @@ export interface MetricDef {
   key: NumericMetricKey;
   label: string;
   unit: string;
-  group: "downforce" | "drag" | "area-coefficient" | "cop" | "radiator" | "mesh";
+  group: "downforce" | "drag" | "area-coefficient" | "cop" | "radiator" | "mesh" | "sweep";
   better: BetterDirection;
 }
 
@@ -74,6 +74,14 @@ export const METRICS: MetricDef[] = [
 
   // Sim Metadata panel
   { key: "cell_count", label: "Cell Count", unit: "", group: "mesh", better: "neutral" },
+
+  // Batch/sweep -- deliberately its own group, not "mesh": swept_variable
+  // varies per batch (mesh base size, ride height, AoA, ...), so there's no
+  // single fixed unit to put here -- use row.swept_value_unit instead (see
+  // components/detail/sweep-information.tsx). "sweep" is intentionally not
+  // one of the groups force-breakdown.tsx filters on, so it's excluded from
+  // Force Breakdown by construction rather than needing an explicit skip.
+  { key: "swept_value", label: "Swept Value", unit: "", group: "sweep", better: "neutral" },
 ];
 
 export const METRIC_MAP: Record<NumericMetricKey, MetricDef> = Object.fromEntries(

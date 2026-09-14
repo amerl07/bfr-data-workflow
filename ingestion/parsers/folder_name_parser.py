@@ -1,55 +1,77 @@
-"""Parses Drive batch-folder names.
+"""Parses Drive batch/sweep-folder names.
 
-Convention (Proposal Outline §5), applied at the batch-folder level, not to
-individual files inside:
+Convention, decided 2026-09-13 (see CONTRIBUTING.md §1b): deliberately
+reuses the exact same five-token shape as sim_filename_parser.py's job-name
+convention, applied one level up, with the DESCRIPTION token naming the
+*variable being swept* rather than a value along it:
 
-    {COMPONENT}_{VERSION}_{SWEEPTYPE}_{YYYYMMDD}_{INITIALS}
+    {INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}
 
-Component codes: RW (rear wing), FW (front wing), UT (undertray),
-DIF (diffuser), SP (side pod), FC (full car -- lists mounted component
-versions hyphen-separated, e.g. FC_RWv3-UTv1-FWv2_...).
+e.g. `YL_FC_MeshBase_Straight_20260913`, enclosing sims individually named
+`YL_FC_MeshBase30mm_Straight_20260913`, `YL_FC_MeshBase35mm_Straight_20260913`,
+... -- one folder per swept variable, one file per value along it (the
+numeric value + optional unit suffix on each file's own DESCRIPTION token,
+parsed out by sim_filename_parser.extract_swept_value). Reusing the file
+convention's shape rather than inventing a second one means no new naming
+scheme to learn and no second parser implementation -- this module's regex
+is intentionally identical to sim_filename_parser's.
 
-Sweep type codes: VEL, YAW, RH, AOA, COMBO.
-
-Absence of FC implies an isolated-component run.
+Only reached when a post job is actually dropped inside a named batch
+folder (BatchFolderDetector.gs case 1/2) -- a post.zip dropped loose still
+has no `batch_folder_name` at all and never calls this.
 """
 
+import re
 from dataclasses import dataclass
-from typing import List, Optional
+
+from ingestion.parsers.sim_filename_parser import normalize_sweep_type
+
+# Same five-plain-token-plus-date shape as sim_filename_parser._JOB_NAME_PATTERN
+# -- see this module's docstring for why it's intentionally not shared code,
+# just the same shape: the two conventions are allowed to diverge later
+# without one parser silently breaking the other.
+_FOLDER_NAME_PATTERN = re.compile(
+    r"^(?P<initials>[A-Za-z]+)_(?P<component>[A-Za-z0-9]+)_(?P<swept_variable>[A-Za-z0-9]+)"
+    r"_(?P<sweep_type>[A-Za-z0-9]+)_(?P<date>\d{8})$"
+)
+
+_FULL_CAR_COMPONENT = "FC"
 
 
 @dataclass
 class BatchFolderMetadata:
     raw_name: str
+    owner_initials: str
     component: str
-    # TODO: shape not finalized. For an isolated run this is a single
-    # component code + version. For an FC run it's a list of
-    # (component, version) pairs parsed out of the hyphen-separated list
-    # (e.g. "RWv3-UTv1-FWv2" -> [("RW", "v3"), ("UT", "v1"), ("FW", "v2")]).
-    # Decide whether both cases share this field or need separate fields
-    # before implementing.
-    component_versions: List[str]
+    # The variable this batch sweeps (e.g. "MeshBase") -- not a value, see
+    # module docstring. Becomes data/results.csv's swept_variable column.
+    swept_variable: str
     sweep_type: str
     date: str
-    owner_initials: str
     is_full_car: bool
 
 
 def parse_batch_folder_name(folder_name: str) -> BatchFolderMetadata:
-    """Parse a Drive batch-folder name into structured metadata.
+    """Parse a Drive batch/sweep-folder name (see module docstring).
 
-    TODO:
-    - Regex/split on `{COMPONENT}_{VERSION}_{SWEEPTYPE}_{YYYYMMDD}_{INITIALS}`.
-    - Handle the FC case separately: FC_<comp>v<ver>-<comp>v<ver>-..._... has
-      a hyphen-separated version list in the COMPONENT/VERSION slot instead
-      of a single component+version.
-    - Validate COMPONENT against the known code set (RW, FW, UT, DIF, SP, FC)
-      and SWEEPTYPE against (VEL, YAW, RH, AOA, COMBO); decide how to handle
-      an unrecognized code (reject vs. pass through with a warning) rather
-      than defaulting silently.
-    - is_full_car should be True iff the component code is exactly "FC" --
-      but see sim_filename_parser.reconcile_isolated_vs_fullcar for the open
-      question about cross-checking this against the Sabalcore-level ISO_
-      prefix signal.
+    Raises ValueError -- a real error, not NotImplementedError -- on a
+    folder name that doesn't match the convention, since this is no longer
+    a stub: a queue row whose batch folder fails to parse is marked
+    `error: ...`, not `blocked: ...` (see queue_consumer/main.py::process_row).
     """
-    raise NotImplementedError("folder name parsing not yet implemented")
+    match = _FOLDER_NAME_PATTERN.match(folder_name)
+    if not match:
+        raise ValueError(
+            "batch folder name does not match "
+            f"{{INITIALS}}_{{COMPONENT}}_{{SWEPTVARIABLE}}_{{SWEEPTYPE}}_{{YYYYMMDD}}: {folder_name!r}"
+        )
+
+    return BatchFolderMetadata(
+        raw_name=folder_name,
+        owner_initials=match.group("initials"),
+        component=match.group("component"),
+        swept_variable=match.group("swept_variable"),
+        sweep_type=normalize_sweep_type(match.group("sweep_type")),
+        date=match.group("date"),
+        is_full_car=match.group("component") == _FULL_CAR_COMPONENT,
+    )

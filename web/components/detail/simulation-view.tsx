@@ -56,7 +56,7 @@ export function SimulationView() {
 
       <RawDataPanel raw={row.raw_force_values} />
 
-      <SweepInformation row={row} />
+      <SweepInformation row={row} all={rows} />
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Scene Gallery</h2>

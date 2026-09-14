@@ -56,6 +56,13 @@ link-able too -- that folder is deliberately named without a `post_` prefix
 so it isn't mistaken for a new post job and reprocessed in a loop. Don't
 rename generated `*_extracted` folders to start with `post_`.
 
+A batch folder's *name* isn't validated here at all -- this file only cares
+that it's a folder directly under `WATCHED_FOLDER_ID` and doesn't start
+with `post_`. The naming convention that gives that name meaning downstream
+(`ingestion/parsers/folder_name_parser.py`) -- and, as of 2026-09-13, lets
+several sims sharing a folder be treated as one parameter sweep/batch -- is
+documented in `CONTRIBUTING.md` §1b, not here.
+
 ## Processing queue
 
 `Dispatcher.handOffNewFile` appends a row (timestamp, file id/name, batch
