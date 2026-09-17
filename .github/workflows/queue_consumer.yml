@@ -49,6 +49,19 @@ jobs:
         run: python -m ingestion.queue_consumer.main
 
       - name: Commit data/results.csv if it changed
+        # Confirmed 2026-09-17: the concurrency group above stops two runs
+        # from EXECUTING at once, but not from racing on the push -- e.g. a
+        # manual commit (or another trigger's run) landing on origin/main
+        # between this job's checkout and its own `git push` still makes
+        # the plain `git push` below fail (non-fast-forward), and that
+        # happened for a real batch: ingestion/queue_consumer/main.py had
+        # already marked every row in that batch "done" in the Processing
+        # Queue sheet (status is set right after a successful *local*
+        # append, well before this step runs), so the lost row was never
+        # retried -- queue_consumer only ever re-reads rows still marked
+        # "pending". Rebase onto the latest origin/main and retry a few
+        # times before giving up, so a losing race self-heals here instead
+        # of silently stranding a "done" row with no data in results.csv.
         run: |
           if git diff --quiet -- data/results.csv; then
             echo "No changes to data/results.csv"
@@ -57,5 +70,14 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add data/results.csv
             git commit -m "Auto-update data/results.csv from queue consumer"
-            git push
+            for attempt in 1 2 3 4 5; do
+              if git push; then
+                exit 0
+              fi
+              echo "Push attempt $attempt failed -- rebasing onto latest origin/main and retrying"
+              git fetch origin main
+              git rebase origin/main
+            done
+            echo "Failed to push data/results.csv after 5 attempts" >&2
+            exit 1
           fi
