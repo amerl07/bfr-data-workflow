@@ -110,6 +110,33 @@ post.zip -- `ingestion/drive-watcher/BatchFolderDetector.gs` detects it
 automatically (no drive-watcher changes needed; it already treats any
 folder name that doesn't start with `post_` as a batch folder).
 
+**Common mistake (confirmed 2026-09-16): do not prefix the batch folder
+itself with `post_`, and do not zip it.** `post_` marks an individual job
+artifact (`post_<job_name>.zip` or its unzipped-folder equivalent, §0/here)
+-- a batch folder is a *plain* Drive folder named exactly
+`{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}`, no `post_`,
+no `.zip`. Get this wrong either way and the batch folder itself gets
+misdetected as a single post job instead of a batch folder:
+- **Folder, `post_`-prefixed** (e.g. `post_YL_FC_MeshBase_Straight_20260913`,
+  no `.zip`) -- `BatchFolderDetector.gs`'s `isNewBatchFolder` explicitly
+  excludes anything matching `POST_FOLDER_NAME_PATTERN`
+  (`/^post_.+$/`), so this is instead classified as an already-unzipped
+  single post job (case 4). `sim_filename_parser.parse_post_zip_filename`
+  then raises a specific error identifying this exact mistake (detected via
+  the DESCRIPTION token -- here `MeshBase` -- having no digits, i.e. it's a
+  swept-variable name, not a per-value description) and tells you what to
+  rename it to.
+- **Zipped** (e.g. `post_YL_FC_MeshBase_Straight_20260913.zip` containing
+  every value's files bundled together) -- parses fine as one ordinary job
+  (its `DESCRIPTION`, `MeshBase`, is a syntactically valid non-swept
+  description), silently producing a single row with no `swept_value`
+  instead of one row per value, and usually blank force values too since
+  `force_reports.txt` ends up nested wherever the zip happened to bundle it.
+
+Either way, the fix is the same: a real Drive **folder** named without
+`post_`, containing **separate** `post_<job_name>.zip` files, one per swept
+value.
+
 **Why the same shape as §1, not a new syntax:** nothing new to learn, and
 `ingestion/parsers/folder_name_parser.py` reuses the same regex/sweep-type
 normalization as `sim_filename_parser.py`.

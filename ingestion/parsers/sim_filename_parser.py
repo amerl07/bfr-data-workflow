@@ -131,9 +131,51 @@ def parse_post_zip_filename(filename: str) -> SimFileMetadata:
     an anomaly and raises, rather than being routed anywhere.
     """
     if not (filename.startswith("post_") and filename.endswith(".zip")):
-        raise ValueError(f"expected a post_<job_name>.zip filename, got: {filename!r}")
+        _raise_not_post_zip(filename)
     job_name = filename[len("post_") : -len(".zip")]
     return _parse_job_name(filename, job_name)
+
+
+def _raise_not_post_zip(filename: str) -> None:
+    """Raises for parse_post_zip_filename's not-a-`post_<job_name>.zip`
+    case, with a more specific message when `filename` looks like the
+    *batch/sweep folder itself* (see folder_name_parser.py) rather than an
+    individual job -- confirmed 2026-09-16 as an easy mistake: a batch
+    folder is `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}`
+    with NO `post_` prefix (unlike a job's post.zip, which always has one),
+    so uploading it as e.g. `post_YL_FC_MeshBase_Straight_20260913` (a
+    folder, no `.zip`, extra `post_` tacked on) makes BatchFolderDetector.gs
+    treat it as an individual already-unzipped post job instead of the
+    batch folder it's meant to be, and lands here.
+
+    Detected via the DESCRIPTION token having no digits -- a real per-value
+    job description always ends in the swept value (e.g. "MeshBase30mm"),
+    while a batch folder's SWEPTVARIABLE token never does (e.g. "MeshBase")
+    -- same "value present" signal sim_filename_parser.extract_swept_value
+    itself splits on. Not foolproof (a genuinely digit-free one-off
+    description would also trip this), but the generic fallback message
+    below still applies to a filename that doesn't match the job-name shape
+    at all.
+    """
+    if filename.startswith("post_") and not filename.endswith(".zip"):
+        candidate = filename[len("post_") :]
+        match = _JOB_NAME_PATTERN.match(candidate)
+        if match and not any(ch.isdigit() for ch in match.group("description")):
+            example = (
+                f"post_{match.group('initials')}_{match.group('component')}_"
+                f"{match.group('description')}30mm_{match.group('sweep_type')}_"
+                f"{match.group('date')}.zip"
+            )
+            raise ValueError(
+                f"{filename!r} looks like a batch/sweep folder "
+                f"({{INITIALS}}_{{COMPONENT}}_{{SWEPTVARIABLE}}_{{SWEEPTYPE}}_{{YYYYMMDD}}, "
+                f"i.e. {candidate!r}) that got an extra 'post_' prefix and was uploaded as "
+                "a job folder instead. Batch folders are NOT prefixed with 'post_' -- only "
+                f"individual post_<job_name>.zip files are. Rename this folder to {candidate!r} "
+                f"and put separate post_<job_name>.zip files (one per swept value, e.g. {example!r}) "
+                "inside it, rather than uploading the batch folder itself as a post job."
+            )
+    raise ValueError(f"expected a post_<job_name>.zip filename, got: {filename!r}")
 
 
 def _parse_job_name(raw_name: str, job_name: str) -> SimFileMetadata:

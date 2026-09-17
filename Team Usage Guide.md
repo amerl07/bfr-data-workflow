@@ -15,20 +15,42 @@ https://github.com/amerl07/bfr-data-workflow.
 ## 1. Workflow
 
 1. **Run your sim** on Sabalcore as usual. See https://docs.google.com/document/d/1hN6mHg-wJhHBhw11GJ4ZimBdNPMyy06pYu70YtxgMXE/edit?usp=sharing
+   
 2. **Name the job** using the naming convention below (see §2) — this
    matters since the job name is baked into the
    `post.zip` filename and that's how everything downstream (component,
    sweep type, owner, date) gets parsed out automatically. There's no way
    to fix it afterwards except uploading again with the right name.
+
 3. **Drop `post_<job_name>.zip`** into the shared watched Drive folder:
    https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
    You can drop it loose in that folder — no need to create a subfolder.
+
    **Running a sweep** (several sims, one parameter changing between them —
-   e.g. mesh base size at 30mm/35mm/40mm) Enclose them in a folder named
+   e.g. mesh base size at 30mm/35mm/40mm): create a **folder** (not a zip)
+   named
    `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` (e.g.
-   `YL_FC_MeshBase_Straight_20260913`) instead of dropping them loose — see
-   `CONTRIBUTING.md` §1b. The web app will then show them together as a
-   batch on each sim's detail page.
+   `YL_FC_MeshBase_Straight_20260913` — note: `SWEPTVARIABLE` is the name of
+   the thing being varied, e.g. `MeshBase`, not one of its values) directly
+   in the drop-off folder above, and drop your **separate**
+   `post_<job_name>.zip` files inside it — one per swept value, each named
+   the normal way but with the value+unit appended to its own
+   `DESCRIPTION` field, e.g.:
+   ```
+   YL_FC_MeshBase_Straight_20260913/                       <- the sweep folder
+   ├── post_YL_FC_MeshBase30mm_Straight_20260913.zip
+   ├── post_YL_FC_MeshBase35mm_Straight_20260913.zip
+   └── post_YL_FC_MeshBase40mm_Straight_20260913.zip
+   ```
+   The web app will then show them together as a batch on each sim's detail
+   page (See `CONTRIBUTING.md` §1b for the full rules).
+
+   ⚠️ **Do NOT put `post_` on the sweep folder's own name, and do NOT zip
+   the sweep folder itself. The sweep folder is a plain Drive folder named
+   `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` — no
+   `post_` prefix, no `.zip` — and only the individual value files inside it
+   get the usual `post_<job_name>.zip` treatment.
+
 4. **Detection is automatic**, usually within about a minute. A row
    appears in the Processing Queue sheet (see §3) with status `pending`.
 5. **Processing is also automatic** from there — it downloads your
@@ -121,4 +143,4 @@ anything for a new `done` run to show up, just reload the page.
 
 ## 5. Questions, bugs, suggestions
 
-Direct all questions **Yumo Liu** (liuyumo@berkeley.edu). If something looks wrong (a stuck queue row, a bad parse, a confusing bit of the web app) or you have an idea for what'd make this more useful let me know.
+Direct all questions **Yumo Liu** (liuyumo@berkeley.edu / liuyumo422@gmail.com). If something looks wrong (a stuck queue row, a bad parse, a confusing bit of the web app) or you have an idea for what'd make this more useful let me know.

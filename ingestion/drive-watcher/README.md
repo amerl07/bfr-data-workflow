@@ -63,6 +63,16 @@ with `post_`. The naming convention that gives that name meaning downstream
 several sims sharing a folder be treated as one parameter sweep/batch -- is
 documented in `CONTRIBUTING.md` §1b, not here.
 
+**Real user mistake (2026-09-16):** since this file's only signal for "is
+this a batch folder" is "doesn't start with `post_`", a batch folder
+mistakenly named *with* a `post_` prefix (e.g.
+`post_YL_FC_MeshBase_Straight_20260913`, meant to be the sweep folder from
+CONTRIBUTING.md §1b) is silently reclassified as case 4 above (a single
+already-unzipped post job) instead of a batch folder -- there's no
+validation error at this layer, it just routes to the wrong place and fails
+downstream in `sim_filename_parser.parse_post_zip_filename` (which does
+detect and explain this specific case in its error message).
+
 ## Processing queue
 
 `Dispatcher.handOffNewFile` appends a row (timestamp, file id/name, batch
