@@ -508,13 +508,25 @@ def download_zip(drive, file_id, file_name, tmp_dir):
     return dest_path
 
 
+
+# Junk macOS adds to a zip made via Finder's "Compress" -- never real post.zip
+# content, and must be ignored when deciding whether the zip root is a single
+# wrapper folder (see unzip() below): confirmed 2026-09-16 that a zip with a
+# wrapper folder *and* a sibling __MACOSX folder was making the "exactly one
+# top-level entry" check fail, leaving the wrapper folder undescended into --
+# so force_reports.txt and every scene image inside it silently vanished
+# (surfaced as MISSING:<wrapper-name>;MISSING:__MACOSX in scene_image_refs,
+# not an error, since both were just skipped as non-files).
+_ZIP_JUNK_NAMES = {"__MACOSX", ".DS_Store"}
+
+
 def unzip(zip_path, tmp_dir):
     extract_dir = Path(tmp_dir) / "extracted"
     extract_dir.mkdir()
     with zipfile.ZipFile(zip_path) as zf:
         zf.extractall(extract_dir)
 
-    entries = list(extract_dir.iterdir())
+    entries = [p for p in extract_dir.iterdir() if p.name not in _ZIP_JUNK_NAMES]
     if len(entries) == 1 and entries[0].is_dir():
         # Confirmed against a real upload: some post.zip exports wrap
         # everything in a single top-level folder (e.g.
