@@ -59,6 +59,10 @@ ingestion/
                            but that schedule isn't reliable right now (see
                            "Automated ingestion" below) -- run manually
                            for the time being.
+  harvester/               Python: SSHes into Sabalcore, uploads finished
+                           runs' post.zips into the watched Drive folder
+                           (loose -- no batch folders yet, see its TODO).
+                           Runs as the `harvest` job in queue_consumer.yml.
   parsers/                 Python: folder-name parser (still a stub -- batch
                            folders out of current scope), Sabalcore
                            .sim/post.zip filename parser, post.zip file
@@ -129,6 +133,21 @@ the fix is an external cron service calling that API on a real schedule:
 
 Both triggers share the workflow's `concurrency` group, so if the schedule
 and the external cron ever overlap, one just waits rather than racing.
+
+**3. Sabalcore harvester secret.** The workflow's `harvest` job
+(`ingestion/harvester/main.py`) needs a repo secret named
+`SABALCORE_PASSWORD` holding the shared `brklyrc01` SSH password. Locally,
+put it in `ingestion/harvester/.env` instead (gitignored; `SABALCORE_HOST=`,
+`SABALCORE_USER=`, `SABALCORE_PASSWORD=` lines). Only runs dated on/after
+`HARVEST_SINCE` in that file are uploaded automatically; backfill older
+ones on purpose with `--since YYYYMMDD` (try `--dry-run` first).
+
+**TODO -- sweep/batch support in the harvester.** Harvested post.zips land
+loose under the watched folder, so a sweep still has to be grouped by
+moving its zips into a batch folder by hand (CONTRIBUTING.md §1b). Plan:
+add a "sweep" field to the relay app's submit form, have the relay record
+each run's batch folder name on Sabalcore, and have the harvester upload
+into that folder. Details in `ingestion/harvester/main.py`'s docstring.
 Moving the consumer off GitHub Actions entirely onto Google Cloud
 Scheduler + Cloud Function/Run would be more "proper" but is real
 infrastructure to stand up and maintain -- not pursued given the above

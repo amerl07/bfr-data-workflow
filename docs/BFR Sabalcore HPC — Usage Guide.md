@@ -1,6 +1,9 @@
+# BFR Sabalcore HPC — Usage Guide
+
+# **BFR Sabalcore HPC — Usage Guide**
 
 **Berkeley Formula Racing · Aerodynamics ·** **Dohyun Yang**  
- **Last updated:** June 2026
+**Last updated:** June 2026
 
 ---
 
@@ -33,7 +36,7 @@ The relay VM maintains two persistent SSH connections to Sabalcore: one for live
 
 1. Navigate to: **`https://159.54.164.154`**  
 2. On first visit, your browser will warn about the self-signed certificate. Click **Advanced → Proceed** (Chrome). This is a one-time step per browser.  
-3. Enter the team passphrase on the login screen: **BerkeleyAero1**
+3. Enter the team passphrase on the login screen
 
 ---
 
@@ -162,8 +165,49 @@ ssh ubuntu@159.54.164.154   \# relay VM
 ssh brklyrc01@login.sabalcore.com   \# then from relay
 
 ---
+
 ## **Contact**
 
 **Relay app / HPC issues:** Dohyun Yang
 
-# sdf
+# Stats via SSH
+
+# Walltime
+
+**Context:** The Sabalcore relay web app doesn't expose live `qstat`/PBS log info — only submit, monitor (queued/running/complete), and post-download-on-complete. To check walltime or read PBS logs directly, you need SSH into Sabalcore.
+
+### **1\. SSH access**
+
+In terminal, 
+
+ssh brklyrc01@login.sabalcore.com
+
+Password-based (get the shared team password from Dohyun/teammate). Relay VM (`ubuntu@159.54.164.154`) uses key-only auth and isn't needed for this.
+
+### **2\. Find your job**
+
+cd /e/08/brklyrc01/bfr/  
+ls \-lt          \# sorts by most recent activity
+
+If the job is still active, `qstat -u brklyrc01` lists it with its PBS job ID and state (Q/R/C). Once finished, it drops off `qstat` and PBS's own job history is purged fast — `tracejob <jobid>` and `qstat -xf <jobid>` won't have anything.
+
+### **3\. Get walltime from file timestamps**
+
+cd \<job\_name\>  
+ls \-la \--time-style=full-iso
+
+Three files bracket the run:
+
+* **`machinefile`** — written when the job starts on the nodes → **start time**  
+* **`<job_name>_<iter>.sim`** — the solved solution file → **solve-end time**  
+* **`<job_name>.o<jobid>`** — written last, after scene export \+ zip → **job-complete time**
+
+Subtract to get solve time and post-processing time separately, and sum for total wall time.
+
+# Core Hours
+
+Same steps to SSH and in the /bfr directory
+
+wc \-l job\_name/machinefile
+
+Then Core-hours equal the number of CPU cores used multiplied by the job’s wall-time (e.g., 10 cores for 2 hours \= 20 core-hours)
