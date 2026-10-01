@@ -119,8 +119,13 @@ the fix is an external cron service calling that API on a real schedule:
    - Headers: `Authorization: Bearer <the fine-grained PAT>`,
      `Accept: application/vnd.github+json`
    - Body: `{"ref": "main"}`
-   - Schedule: as frequently as the service's plan allows (commonly every
-     1-5 minutes on free tiers).
+   - Schedule: every 5 minutes (matches the workflow's own fallback
+     `schedule:` cron; runs that overlap queue behind the `queue-consumer`
+     concurrency group rather than racing).
+
+   The PAT is named `bfr-queue-consumer-cron` and expires periodically. When
+   it does, generate a new one and paste it into this job's `Authorization`
+   header on the cron service -- nothing in the repo needs to change.
 
 Both triggers share the workflow's `concurrency` group, so if the schedule
 and the external cron ever overlap, one just waits rather than racing.
