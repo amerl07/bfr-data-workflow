@@ -54,6 +54,7 @@ Auth:
 Usage (from repo root):
     .venv/bin/python -m ingestion.harvester.main --dry-run
     .venv/bin/python -m ingestion.harvester.main --since 20260801 --limit 3
+    .venv/bin/python -m ingestion.harvester.main --since 20260101 --job <job_name>
 """
 
 import argparse
@@ -111,6 +112,7 @@ def main():
     parser.add_argument("--since", default=os.environ.get("HARVEST_SINCE", HARVEST_SINCE),
                         help="YYYYMMDD; skip runs whose job-name date is earlier (default %(default)s)")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="max uploads this run")
+    parser.add_argument("--job", help="only this job name (still skipped if already handled)")
     args = parser.parse_args()
 
     creds = get_credentials()
@@ -125,6 +127,8 @@ def main():
         todo = []
         for run in runs:
             if run.zip_name in already_handled:
+                continue
+            if args.job and run.job_name != args.job:
                 continue
             run_date = job_name_date(run.job_name)
             if run_date is None or run_date < args.since:
