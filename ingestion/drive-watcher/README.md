@@ -81,7 +81,11 @@ creates on first use (title `BFR Drive Watcher - Processing Queue`; its ID
 is persisted in Script Properties as `DRIVE_WATCH_QUEUE_SPREADSHEET_ID` so
 later calls reuse it). `ingestion/queue_consumer/` reads this queue and
 updates each row's status to `processing`, then `done` /
-`blocked: <reason>` / `error: <reason>`. Run `ensureQueueSheetExists()` once
+`blocked: <reason>` / `error: <reason>` -- or straight to `skipped:
+duplicate (already in results.csv)` when that job is already ingested
+(the same post.zip uploaded again as a new Drive file, e.g. by the
+harvester and then by hand -- `isAlreadyQueued` below only catches the
+same `file_id`). Run `ensureQueueSheetExists()` once
 from the editor (same reason as `startWatch`/`installRenewalTrigger` -- see
 "Running functions" below) if you need to (re-)grant the Sheets scope this
 needs.

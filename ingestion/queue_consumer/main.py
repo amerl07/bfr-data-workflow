@@ -310,8 +310,9 @@ def main():
     sheets = build("sheets", "v4", credentials=creds)
     drive = build("drive", "v3", credentials=creds)
 
+    ingested = read_ingested_job_keys()
     for row_number, row in read_pending_rows(sheets):
-        process_row(sheets, drive, row_number, row)
+        process_row(sheets, drive, row_number, row, ingested)
 
 
 def get_credentials():
@@ -371,11 +372,45 @@ def read_pending_rows(sheets):
     return pending
 
 
-def process_row(sheets, drive, row_number, row):
+def read_ingested_job_keys():
+    """_duplicate_key of every post_zip_name already in data/results.csv.
+
+    The watcher's isAlreadyQueued (Dispatcher.gs) dedupes by Drive file_id
+    only, so the same post.zip uploaded twice as two separate Drive files
+    -- e.g. once by ingestion/harvester and again by hand -- gets two queue
+    rows. results.csv (not the queue sheet's "done" rows) is the source of
+    truth here: a row can be "done" yet missing from results.csv if the
+    workflow's push lost a race (see queue_consumer.yml), and re-dropping
+    the file is how that gets recovered, so it must not be skipped."""
+    if not RESULTS_CSV_PATH.exists():
+        return set()
+    with RESULTS_CSV_PATH.open(newline="") as f:
+        return {
+            _duplicate_key(row["post_zip_name"])
+            for row in csv.DictReader(f)
+            if row.get("post_zip_name")
+        }
+
+
+def _duplicate_key(file_name):
+    """post_<job_name>.zip and an already-unzipped post_<job_name> folder
+    are the same job (BatchFolderDetector.gs cases 3 vs. 4)."""
+    return file_name[: -len(".zip")] if file_name.endswith(".zip") else file_name
+
+
+def process_row(sheets, drive, row_number, row, ingested):
     # Pad in case trailing empty cells were omitted by the Sheets API.
     detected_at, file_id, file_name, batch_folder_id, batch_folder_name = (
         row + [""] * 5
     )[:5]
+
+    key = _duplicate_key(file_name)
+    if key in ingested:
+        # Before materialize_post_contents, so a duplicate doesn't also
+        # re-upload a second "_extracted" image folder to Drive.
+        print(f"Skipping {file_name} ({file_id}) -- already in data/results.csv")
+        set_status(sheets, row_number, "skipped: duplicate (already in results.csv)")
+        return
 
     print(f"Processing {file_name} ({file_id})")
     set_status(sheets, row_number, "processing")
@@ -393,6 +428,7 @@ def process_row(sheets, drive, row_number, row):
             force_report_text,
         )
         append_result_row(result_row)
+        ingested.add(key)
         set_status(sheets, row_number, "done")
     except NotImplementedError as exc:
         # Expected, not a bug: one of ingestion/parsers/'s stubs. Leave the
