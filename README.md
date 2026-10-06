@@ -14,10 +14,6 @@ one-time setup (GitHub secret + cron service) is completed. Until then, or
 any time you don't want to wait, run
 `.venv/bin/python -m ingestion.queue_consumer.main` (or dispatch the GitHub
 Actions workflow manually).
-`ingestion/parsers/folder_name_parser.py` is still a stub (batch folders
-are out of current scope -- see `CONTRIBUTING.md`'s "Current scope" note),
-so rows involving a batch folder are left "blocked" in the queue rather
-than silently skipped or faked.
 
 **Web front-end:** `web/` is a Next.js static site (Explorer, Simulation
 Detail, Compare, Performance Explorer, Analytics Dashboard) that fetches
