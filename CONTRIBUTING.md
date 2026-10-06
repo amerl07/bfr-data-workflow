@@ -17,7 +17,10 @@ types ahead of need. Support for other artifact types -- e.g. a CSV-based
 Bayesian sweep trials log (see the open question in §5) -- is a known future
 extension, not something to build out now. A post job can still be dropped
 loose (no batch folder) as before, or nested inside a named batch/sweep
-folder -- see §1b for when and how to use one.
+folder -- see §1b for when and how to use one. Most loose `post_<job_name>.zip`
+drops now come from `ingestion/harvester/` (pulls finished runs straight off
+Sabalcore) rather than by hand; it always uploads loose, so batch folders
+are still a manual step (see its TODO and README.md "Automated ingestion").
 
 ## 1. Source file naming convention
 

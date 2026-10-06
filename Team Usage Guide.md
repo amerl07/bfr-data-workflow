@@ -1,5 +1,5 @@
 # BFR Aero Data Workflow — Team Guide
-Last updated: July 30, 2026 - Yumo Liu
+Last updated: October 6, 2026 - Yumo Liu
 
 This is the short version: how to get your sim results into the shared
 database and how to find them again. For full technical reference see
@@ -22,9 +22,18 @@ https://github.com/amerl07/bfr-data-workflow.
    sweep type, owner, date) gets parsed out automatically. There's no way
    to fix it afterwards except uploading again with the right name.
 
-3. **Drop `post_<job_name>.zip`** into the shared watched Drive folder:
+3. **Getting `post_<job_name>.zip` into Drive is automatic** for single
+   runs: a harvester checks Sabalcore every few minutes and uploads each
+   finished run's `post.zip` loose into the watched Drive folder for you —
+   no need to download it from the relay app. It only picks up runs whose
+   job name ends in a `_YYYYMMDD` date on or after Sept 30, 2026, so name
+   your job correctly *before* submitting (§2).
+
+   **Dropping it by hand still works** (and is needed if your job name has
+   no trailing date): download `post_<job_name>.zip` from the relay app and
+   drop it loose into the shared watched Drive folder:
    https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
-   You can drop it loose in that folder — no need to create a subfolder.
+   If you drop it before the harvester gets to it, the harvester skips it.
 
    **Running a sweep** (several sims, one parameter changing between them —
    e.g. mesh base size at 30mm/35mm/40mm): create a **folder** (not a zip)
@@ -45,6 +54,11 @@ https://github.com/amerl07/bfr-data-workflow.
    The web app will then show them together as a batch on each sim's detail
    page (See `CONTRIBUTING.md` §1b for the full rules).
 
+   ⚠️ **The harvester doesn't know about sweeps yet** — it uploads every
+   run loose, never into a sweep folder. If your sweep's zips were
+   harvested loose before you could put them in the sweep folder, ping
+   Yumo to regroup them.
+
    ⚠️ **Do NOT put `post_` on the sweep folder's own name, and do NOT zip
    the sweep folder itself. The sweep folder is a plain Drive folder named
    `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` — no
@@ -61,7 +75,7 @@ https://github.com/amerl07/bfr-data-workflow.
    either, it always reflects the latest data.
 
 ## 2. Naming convention
-This is easiest if the convention is followed when you upload the sim to Sabalcore, as you won't be needing to change the name after the job finishes. If not, modify the name to follow the `post.zip` pattern below before you upload to drive.
+This is easiest if the convention is followed when you upload the sim to Sabalcore, as you won't be needing to change the name after the job finishes. If not, the harvester may skip it or its upload may fail to parse — modify the name to follow the `post.zip` pattern below and drop it into Drive by hand.
 
 Job names to Sabalcore follow one fixed pattern:
 

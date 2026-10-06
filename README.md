@@ -1,13 +1,16 @@
 # bfr-data-workflow
 
 Data ingestion pipeline for Berkeley Formula Racing's aero CFD workflow:
-watches a shared Google Drive folder for Sabalcore `post.zip` outputs,
-parses them into structured rows, and keeps a central, queryable record of
-sim results instead of scattered per-person spreadsheets.
+pulls finished runs' `post.zip` outputs off Sabalcore into a shared Google
+Drive folder, watches that folder, parses each `post.zip` into structured
+rows, and keeps a central, queryable record of sim results instead of
+scattered per-person spreadsheets.
 
-**Status:** the full pipeline (detection → queue → parse → `data/results.csv`)
-is implemented and has been verified end-to-end on real uploads
-(2026-07-29). Drive detection is fully automatic. The consumer side is
+**Status:** the full pipeline (harvest → detection → queue → parse →
+`data/results.csv`) is implemented and has been verified end-to-end on real
+uploads (2026-07-29; the harvester stage was added 2026-09-30 -- before
+that, every `post.zip` was downloaded from the relay app and dropped into
+Drive by hand, which still works). Drive detection is fully automatic. The consumer side is
 designed to run automatically too -- a scheduled GitHub Actions run pinged
 by an external cron service, see "Automated ingestion" below -- once its
 one-time setup (GitHub secret + cron service) is completed. Until then, or
@@ -28,6 +31,7 @@ worth knowing before debugging or handing this off:
 
 | Stage | Tool | Where it runs / is hosted |
 |---|---|---|
+| Pull finished runs off Sabalcore | Python harvester (`ingestion/harvester/`): SSH/SFTP (`paramiko`) into the shared `brklyrc01` account, resumable upload into the watched Drive folder. Read-only on Sabalcore; independent of the relay app | The `harvest` job in `.github/workflows/queue_consumer.yml` (same trigger as the consumer). Also runnable locally: `.venv/bin/python -m ingestion.harvester.main --dry-run`. Manual drops into the Drive folder still work alongside it |
 | Watch the Drive folder | Google Apps Script (standalone project, `ingestion/drive-watcher/`) | Google's Apps Script runtime (script.google.com) -- not this repo's CI, not anyone's laptop |
 | Detect new uploads | Google Drive API v3 (`Drive.Changes.list`), polled by a 1-minute time-driven trigger | Same Apps Script project. Push notifications (`Drive.Changes.watch` + a web app `doPost`) are still wired up but not relied on -- they never fired reliably; see `ingestion/drive-watcher/README.md` |
 | Processing queue | A Google Sheet ("BFR Drive Watcher - Processing Queue", `Queue` tab) | Auto-created in Drive by the Apps Script project on first run; filed into the folder set as `GENERATED_SHEETS_FOLDER_ID` in `Config.gs`. Its ID is `QUEUE_SPREADSHEET_ID` in `ingestion/queue_consumer/main.py` |
@@ -66,7 +70,9 @@ ingestion/
                            implemented).
 .github/
   workflows/               queue_consumer.yml -- scheduled + manually
-                           dispatchable run of the queue consumer.
+                           dispatchable run of the queue consumer
+                           (`consume` job) and the harvester (`harvest`
+                           job).
 data/
   results.csv             One row per post.zip processed -- the actual
                            tracked deliverable (unlike raw sim outputs,
@@ -75,9 +81,14 @@ data/
 
 ## Automated ingestion
 
-`.github/workflows/queue_consumer.yml` runs the queue consumer and commits
-any new rows to `data/results.csv` back to `main`. Two pieces of one-time
-setup make that unattended, neither yet done as of this writing:
+`.github/workflows/queue_consumer.yml` runs two independent jobs on each
+trigger: `consume` runs the queue consumer and commits any new rows to
+`data/results.csv` back to `main`; `harvest` runs the Sabalcore harvester,
+whose uploads are detected by the drive-watcher and ingested by `consume`
+on a later run (not the same one). The harvester is a separate job so an
+SSH/Sabalcore failure shows up as its own red job without blocking
+ingestion of what's already queued. Three pieces of one-time setup make
+this unattended:
 
 **1. Auth secret.** The workflow authenticates with the same OAuth
 installed-app credentials as a local run -- not a service account (one was
@@ -132,11 +143,28 @@ and the external cron ever overlap, one just waits rather than racing.
 
 **3. Sabalcore harvester secret.** The workflow's `harvest` job
 (`ingestion/harvester/main.py`) needs a repo secret named
-`SABALCORE_PASSWORD` holding the shared `brklyrc01` SSH password. Locally,
+`SABALCORE_PASSWORD` holding the shared `brklyrc01` SSH password (host and
+user are hard-coded in the workflow; it reuses `GOOGLE_OAUTH_TOKEN_JSON`
+for Drive/Sheets). Locally,
 put it in `ingestion/harvester/.env` instead (gitignored; `SABALCORE_HOST=`,
 `SABALCORE_USER=`, `SABALCORE_PASSWORD=` lines). Only runs dated on/after
 `HARVEST_SINCE` in that file are uploaded automatically; backfill older
 ones on purpose with `--since YYYYMMDD` (try `--dry-run` first).
+
+How it decides what to upload (full detail in `main.py`'s docstring):
+- **Finished** = the run directory (`/e/08/brklyrc01/bfr/<job_name>/`)
+  holds both `post_<job_name>.zip` and a PBS stdout log
+  `<job_name>.o<jobid>`, which PBS writes after the zip step -- so a
+  half-written zip is never picked up.
+- **Already handled** (skipped) = its `post.zip` name is already in the
+  Processing Queue sheet (including `error`/`blocked` rows, so a failed
+  parse isn't re-uploaded forever), in `data/results.csv`, or loose in the
+  watched folder awaiting the watcher's next poll.
+- **Dated** = the job name must end in `_YYYYMMDD` on/after the cutoff;
+  job names without a trailing date are never harvested and still have to
+  be dropped into Drive by hand.
+- At most 5 uploads per run (`--limit`), so a backlog drains over several
+  runs.
 
 **TODO -- sweep/batch support in the harvester.** Harvested post.zips land
 loose under the watched folder, so a sweep still has to be grouped by
@@ -171,7 +199,7 @@ query needs outgrow what's comfortable against a flat file.
 
 ## Docs
 
-- [`docs/Team Usage Guide.md`](<docs/Team Usage Guide.md>) — start here if
+- [`Team Usage Guide.md`](<Team Usage Guide.md>) — start here if
   you're a team member submitting runs, not building the pipeline: the
   end-to-end workflow, naming convention, and how to use the web app.
 - [`docs/Aero Subsystem Data Workflow — Proposal Outline.md`](<docs/Aero Subsystem Data Workflow — Proposal Outline.md>)
