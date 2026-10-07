@@ -768,7 +768,10 @@ def append_result_row(row):
     instead of starting a fresh one. Checked (not just assumed) on every
     call rather than only fixed once, since something outside this script's
     control -- editor/linter, manual edits -- can just as easily strip a
-    trailing newline between two runs.
+    trailing newline between two runs. The repair writes "\r\n", not "\n",
+    to match csv.writer's default lineterminator: a lone "\n" in an
+    otherwise CRLF file makes the web app's CSV parser (which detects CRLF
+    from the first line) merge that line with the next (2026-10-06).
     """
     if RESULTS_CSV_PATH.exists() and RESULTS_CSV_PATH.stat().st_size > 0:
         with RESULTS_CSV_PATH.open("rb") as f:
@@ -779,7 +782,7 @@ def append_result_row(row):
 
     with RESULTS_CSV_PATH.open("a", newline="") as f:
         if needs_newline:
-            f.write("\n")
+            f.write("\r\n")
         csv.DictWriter(f, fieldnames=RESULTS_FIELDS).writerow(row)
 
 

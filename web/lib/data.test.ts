@@ -81,6 +81,15 @@ describe("parseResultsCsv", () => {
     expect(parseResultsCsv(csv).map((r) => r.job_name)).toEqual(["A", "B", "C"]);
   });
 
+  it("does not merge rows when a CRLF file has one bare-LF line ending", () => {
+    // Reproduces 2026-10-06: a hand edit left one "\n" in an otherwise
+    // "\r\n" results.csv, and the row after it vanished from the web app.
+    const csv =
+      HEADER + "\r\n" + row({ job_name: "A" }) + "\n" + row({ job_name: "B" }) + "\r\n" +
+      row({ job_name: "C" }) + "\r\n";
+    expect(parseResultsCsv(csv).map((r) => r.job_name)).toEqual(["A", "B", "C"]);
+  });
+
   it("normalizes sweep_type case and CORNER/STRAIGHT aliases so legacy hand-added rows match ingested ones", () => {
     const csv = [
       HEADER,

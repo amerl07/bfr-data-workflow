@@ -57,7 +57,10 @@ export function normalizeSweepType(raw: string): string {
 /** Pure CSV-text -> SimRow[] parser, split out from fetchResults so it's testable
  * without a network call. */
 export function parseResultsCsv(csvText: string): SimRow[] {
-  const { data } = Papa.parse<Record<string, string>>(csvText, {
+  // Normalize line endings first: Papa auto-detects the newline from the
+  // first line, so a single bare "\n" row in a CRLF file (e.g. left by a
+  // hand edit) gets merged with the following row and silently disappears.
+  const { data } = Papa.parse<Record<string, string>>(csvText.replace(/\r\n?/g, "\n"), {
     header: true,
     skipEmptyLines: true,
   });
