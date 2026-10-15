@@ -68,7 +68,7 @@ export function SimCard({
             View Details
           </Link>
           <Link
-            href={`/compare?a=${encodeURIComponent(row.job_name)}`}
+            href={`/compare?sim=${encodeURIComponent(row.job_name)}`}
             className={buttonVariants({ variant: "outline", size: "sm", className: "flex-1" })}
           >
             Compare

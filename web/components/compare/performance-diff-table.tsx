@@ -1,56 +1,67 @@
 import type { SimRow } from "@/lib/types";
-import { METRICS, compareMetric } from "@/lib/metrics";
+import { METRICS } from "@/lib/metrics";
+import { absoluteDeltaTone, percentDeltaTone, type DeltaTone } from "@/lib/compare";
 import { absoluteDelta, formatNumber, formatPercentDelta, percentDelta } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { SimColumnHeads, STICKY_LABEL_COL } from "@/components/compare/compare-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-/** Metric | A | B | Δ | Δ% — covers both the spec's "Performance Comparison"
- * table and its separate "Difference Summary" ask (abs + % diff per metric)
- * in one table rather than duplicating the same numbers twice. */
-export function PerformanceDiffTable({ a, b }: { a: SimRow; b: SimRow }) {
+function toneClass(tone: DeltaTone) {
+  return cn(
+    tone === "better" && "font-medium text-green-600 dark:text-green-400",
+    tone === "worse" && "font-medium text-red-500 dark:text-red-400",
+  );
+}
+
+function formatSignedNumber(value: number | null, unit: string) {
+  const formatted = formatNumber(value, { unit });
+  return value !== null && value > 0 ? `+${formatted}` : formatted;
+}
+
+/** Metric | one column per sim. Each non-baseline cell shows its value with
+ * Δ and Δ% vs. the baseline underneath -- stacked in-cell rather than as
+ * separate Δ/Δ% columns per sim, so the table only grows one column per
+ * added simulation. */
+export function PerformanceDiffTable({ rows, baseline }: { rows: SimRow[]; baseline: SimRow }) {
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Metric</TableHead>
-          <TableHead>A</TableHead>
-          <TableHead>B</TableHead>
-          <TableHead>Δ</TableHead>
-          <TableHead>Δ%</TableHead>
+          <TableHead className={STICKY_LABEL_COL}>Metric</TableHead>
+          <SimColumnHeads rows={rows} baseline={baseline} />
         </TableRow>
       </TableHeader>
       <TableBody>
         {METRICS.map((m) => {
-          const va = a[m.key];
-          const vb = b[m.key];
-          const aBetter = compareMetric(va, vb, m.better);
-          const bBetter = compareMetric(vb, va, m.better);
-          const delta = absoluteDelta(va, vb);
-          const deltaPct = percentDelta(va, vb);
+          const vBase = baseline[m.key];
           return (
             <TableRow key={m.key}>
-              <TableCell className="text-slate-500 dark:text-slate-400">
+              <TableCell className={cn(STICKY_LABEL_COL, "text-slate-500 dark:text-slate-400")}>
                 {m.label}
                 {m.unit && <span className="text-slate-400"> ({m.unit})</span>}
               </TableCell>
-              <TableCell
-                className={cn(
-                  aBetter === 1 && "font-medium text-green-600 dark:text-green-400",
-                  aBetter === -1 && "text-red-500 dark:text-red-400",
-                )}
-              >
-                {formatNumber(va, { unit: m.unit })}
-              </TableCell>
-              <TableCell
-                className={cn(
-                  bBetter === 1 && "font-medium text-green-600 dark:text-green-400",
-                  bBetter === -1 && "text-red-500 dark:text-red-400",
-                )}
-              >
-                {formatNumber(vb, { unit: m.unit })}
-              </TableCell>
-              <TableCell>{formatNumber(delta, { unit: m.unit })}</TableCell>
-              <TableCell>{formatPercentDelta(deltaPct)}</TableCell>
+              {rows.map((r) => {
+                const v = r[m.key];
+                const isBase = r.job_name === baseline.job_name;
+                const delta = absoluteDelta(vBase, v);
+                const deltaPct = percentDelta(vBase, v);
+                return (
+                  <TableCell key={r.job_name} className="align-top">
+                    <div>{formatNumber(v, { unit: m.unit })}</div>
+                    {!isBase && (delta !== null || deltaPct !== null) && (
+                      <div className="text-xs text-slate-400">
+                        <span className={toneClass(absoluteDeltaTone(m, vBase, v))}>
+                          {formatSignedNumber(delta, m.unit)}
+                        </span>
+                        <span className="mx-1">·</span>
+                        <span className={toneClass(percentDeltaTone(m, vBase, v))}>
+                          {formatPercentDelta(deltaPct)}
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           );
         })}

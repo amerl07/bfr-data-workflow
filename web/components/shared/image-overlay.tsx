@@ -59,22 +59,27 @@ function OpacityControl({
   );
 }
 
-/** Stacked/centered overlay of two images with independent opacity sliders.
+/** Stacked/centered overlay of 2+ images with independent opacity sliders.
+ * images[0] is the bottom layer (fully opaque by default); every later
+ * layer stacks on top at 50% by default. Opacity is keyed by url so
+ * adding/removing a layer doesn't reset the others' sliders.
  * v1 intentionally does not attempt resolution/aspect-ratio alignment --
  * each image is centered and letterboxed within the same frame via
  * object-contain, which is sufficient for eyeballing differences between
- * two renders. Revisit with real alignment logic only if that turns out
+ * renders. Revisit with real alignment logic only if that turns out
  * to be insufficient in practice. */
-export function ImageOverlay({ imageA, imageB }: { imageA: OverlayImage; imageB: OverlayImage }) {
-  const [opacityA, setOpacityA] = useState(100);
-  const [opacityB, setOpacityB] = useState(50);
+export function ImageOverlay({ images }: { images: OverlayImage[] }) {
+  const [opacityOverrides, setOpacityOverrides] = useState<Record<string, number>>({});
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null);
-  const thumbA = driveThumbnailUrl(imageA.url, 1600);
-  const thumbB = driveThumbnailUrl(imageB.url, 1600);
+  const layers = images.map((image, i) => ({
+    ...image,
+    thumb: driveThumbnailUrl(image.url, 1600),
+    opacity: opacityOverrides[image.url] ?? (i === 0 ? 100 : 50),
+  }));
 
   // Re-clamp pan whenever zoom changes (slider/stepper/typed/wheel), so
   // zooming back out snaps the image back into bounds instead of leaving
@@ -142,25 +147,19 @@ export function ImageOverlay({ imageA, imageB }: { imageA: OverlayImage; imageB:
             transformOrigin: "center",
           }}
         >
-          {thumbA && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbA}
-              alt={imageA.label}
-              draggable={false}
-              style={{ opacity: opacityA / 100 }}
-              className="absolute inset-0 h-full w-full object-contain"
-            />
-          )}
-          {thumbB && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbB}
-              alt={imageB.label}
-              draggable={false}
-              style={{ opacity: opacityB / 100 }}
-              className="absolute inset-0 h-full w-full object-contain"
-            />
+          {layers.map(
+            (layer) =>
+              layer.thumb && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={layer.url}
+                  src={layer.thumb}
+                  alt={layer.label}
+                  draggable={false}
+                  style={{ opacity: layer.opacity / 100 }}
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+              ),
           )}
         </div>
       </div>
@@ -178,9 +177,15 @@ export function ImageOverlay({ imageA, imageB }: { imageA: OverlayImage; imageB:
           aria-label="Zoom"
         />
       </div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <OpacityControl label={imageA.label} value={opacityA} onChange={setOpacityA} />
-        <OpacityControl label={imageB.label} value={opacityB} onChange={setOpacityB} />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {layers.map((layer) => (
+          <OpacityControl
+            key={layer.url}
+            label={layer.label}
+            value={layer.opacity}
+            onChange={(v) => setOpacityOverrides((prev) => ({ ...prev, [layer.url]: v }))}
+          />
+        ))}
       </div>
     </div>
   );

@@ -86,8 +86,10 @@ function SelectedOverlay({ images, urls }: { images: string[]; urls: [string, st
 
   return (
     <ImageOverlay
-      imageA={{ url: urls[0], label: nameA || `Image ${indexA + 1}` }}
-      imageB={{ url: urls[1], label: nameB || `Image ${indexB + 1}` }}
+      images={[
+        { url: urls[0], label: nameA || `Image ${indexA + 1}` },
+        { url: urls[1], label: nameB || `Image ${indexB + 1}` },
+      ]}
     />
   );
 }
@@ -97,6 +99,8 @@ export function SceneGallery({
   selectionLimit = 2,
   selectLabel = "Compare 2 images",
   onSelectionChange,
+  defaultCompareMode = false,
+  defaultThumbSize = DEFAULT_THUMB_SIZE,
 }: {
   images: string[];
   /** Max images selectable in compare mode. 2 (default) shows an inline
@@ -106,10 +110,14 @@ export function SceneGallery({
   selectionLimit?: number;
   selectLabel?: string;
   onSelectionChange?: (selected: string[]) => void;
+  /** Start with selection mode already on, so thumbnails select on click
+   * instead of opening the full-size viewer. */
+  defaultCompareMode?: boolean;
+  defaultThumbSize?: number;
 }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const [thumbSize, setThumbSize] = useState(DEFAULT_THUMB_SIZE);
-  const [compareMode, setCompareMode] = useState(false);
+  const [thumbSize, setThumbSize] = useState(defaultThumbSize);
+  const [compareMode, setCompareMode] = useState(defaultCompareMode);
   const [selected, setSelected] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [sortDirection, setSortDirection] = useState<NameSortDirection>("asc");

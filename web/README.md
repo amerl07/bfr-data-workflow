@@ -33,7 +33,8 @@ lazily on hover (`useDriveFileName`, still used for one-off lookups like a
 selected compare-overlay image) -- this is what makes sorting/searching by
 name possible, at the cost of one `files.get` call per image per gallery
 load. Galleries currently run up to ~75 images, and the Compare tab renders
-two side by side (~150 calls on one page view). Per [Google's published Drive
+one gallery per compared sim (~75 calls per sim on one page view, so ~300
+for a 4-way compare). Per [Google's published Drive
 API limits](https://developers.google.com/workspace/drive/api/guides/limits)
 (updated May 2026), a `files.get` read costs 5 quota units against a
 325,000-unit-per-minute-per-user budget -- so this is nowhere close to the
@@ -96,7 +97,8 @@ Source to "GitHub Actions" (not yet enabled as of this writing).
 - `components/{explorer,detail,compare,performance,analytics}/` -- one
   directory per page.
 - `app/` -- five routes: Explorer (`/`), Simulation Detail
-  (`/simulation?job=`), Compare (`/compare?a=&b=`), Performance Explorer
+  (`/simulation?job=`), Compare (`/compare?sim=&sim=...&base=`; legacy
+  `?a=&b=` links still work), Performance Explorer
   (`/performance`), Analytics Dashboard (`/analytics`). Page state (filters,
   selections, scatter axes) lives in the URL query string throughout, so
   every view is shareable via a plain link.
