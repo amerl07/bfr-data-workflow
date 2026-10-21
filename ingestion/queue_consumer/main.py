@@ -230,9 +230,6 @@ RESULTS_FIELDS = [
     "isolated_vs_fullcar",
     "date",
     "owner_initials",
-    # No CL/CD -- force_reports.txt only has raw forces, not coefficients
-    # (no reference velocity/area/air-density to compute one from), and
-    # getting those params out of the sims is hard for this team right now
     # -- see force_reports_parser.py's docstring. raw_force_values stores
     # everything force_reports.txt has, verbatim, regardless of whether a
     # label made it into its own column below.
@@ -545,14 +542,8 @@ def download_zip(drive, file_id, file_name, tmp_dir):
 
 
 
-# Junk macOS adds to a zip made via Finder's "Compress" -- never real post.zip
-# content, and must be ignored when deciding whether the zip root is a single
-# wrapper folder (see unzip() below): confirmed 2026-09-16 that a zip with a
-# wrapper folder *and* a sibling __MACOSX folder was making the "exactly one
-# top-level entry" check fail, leaving the wrapper folder undescended into --
-# so force_reports.txt and every scene image inside it silently vanished
-# (surfaced as MISSING:<wrapper-name>;MISSING:__MACOSX in scene_image_refs,
-# not an error, since both were just skipped as non-files).
+# Ignore Finder's "Compress" junk so a post.zip made on a Mac
+# (post_<job>/ + __MACOSX/) still gets its single wrapper folder entered.
 _ZIP_JUNK_NAMES = {"__MACOSX", ".DS_Store"}
 
 
