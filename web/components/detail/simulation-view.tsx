@@ -9,6 +9,7 @@ import { KpiCards } from "@/components/detail/kpi-cards";
 import { ForceBreakdown } from "@/components/detail/force-breakdown";
 import { SweepInformation } from "@/components/detail/sweep-information";
 import { SceneGallery } from "@/components/detail/scene-gallery";
+import { SliceRoller } from "@/components/shared/slice-roller";
 import { SourceFiles } from "@/components/detail/source-files";
 import { RawDataPanel } from "@/components/detail/raw-data-panel";
 import { RelatedSimulations } from "@/components/detail/related-simulations";
@@ -57,6 +58,8 @@ export function SimulationView() {
       <RawDataPanel raw={row.raw_force_values} />
 
       <SweepInformation row={row} all={rows} />
+
+      <SliceRoller title="Slice Roller" sims={[{ key: row.job_name, urls: row.scene_image_refs }]} />
 
       <section>
         <h2 className="mb-3 text-lg font-semibold">Scene Gallery</h2>

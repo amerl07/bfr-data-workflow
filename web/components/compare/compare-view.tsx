@@ -9,6 +9,7 @@ import { SimPicker } from "@/components/compare/sim-picker";
 import { MetadataDiffTable } from "@/components/compare/metadata-diff-table";
 import { PerformanceDiffTable } from "@/components/compare/performance-diff-table";
 import { CompareGalleries } from "@/components/compare/compare-galleries";
+import { SliceRoller } from "@/components/shared/slice-roller";
 import { LoadingState, ErrorState, EmptyState } from "@/components/status";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,20 @@ export function CompareView() {
             </p>
             <PerformanceDiffTable rows={selected} baseline={baseline} />
           </section>
+
+          <SliceRoller
+            title="Slice Roller"
+            sims={selected.map((r, i) => ({
+              key: r.job_name,
+              tag: String.fromCharCode(65 + i),
+              urls: r.scene_image_refs,
+            }))}
+            // Baseline on the bottom layer, matching the gallery overlay below.
+            overlayOrder={[
+              baseline.job_name,
+              ...selected.filter((r) => r.job_name !== baseline.job_name).map((r) => r.job_name),
+            ]}
+          />
 
           <section>
             <h2 className="mb-3 text-lg font-semibold">Scene Galleries</h2>
