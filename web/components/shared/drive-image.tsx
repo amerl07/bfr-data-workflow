@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties, type ReactNode } from "react";
-import { driveThumbnailUrl } from "@/lib/drive";
+import { driveLegacyThumbnailUrl, driveThumbnailUrl } from "@/lib/drive";
 
 // 1 + 2 + 4 + 8 + 16 s: outlasts the burst while a page's galleries load.
 const MAX_RETRIES = 5;
@@ -28,7 +28,9 @@ export function DriveImage({
 }) {
   const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
-  const thumb = driveThumbnailUrl(url, size);
+  // Retries alternate with Drive's documented endpoint, in case the direct
+  // address (see driveThumbnailUrl) is what's failing.
+  const thumb = attempt % 2 === 0 ? driveThumbnailUrl(url, size) : driveLegacyThumbnailUrl(url, size);
 
   if (!thumb || failed) return <>{fallback}</>;
 
@@ -36,7 +38,7 @@ export function DriveImage({
     // eslint-disable-next-line @next/next/no-img-element
     <img
       // A fresh query param per retry so the browser doesn't reuse the failed response.
-      src={attempt === 0 ? thumb : `${thumb}&retry=${attempt}`}
+      src={attempt === 0 ? thumb : `${thumb}${thumb.includes("?") ? "&" : "?"}retry=${attempt}`}
       alt={alt}
       draggable={false}
       onError={() => {
