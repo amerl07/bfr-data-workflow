@@ -2,13 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Minus, Plus, ZoomIn, ZoomOut } from "lucide-react";
-import { driveThumbnailUrl } from "@/lib/drive";
+import { DriveImage } from "@/components/shared/drive-image";
 import { NumericSlider } from "@/components/shared/numeric-slider";
 import { cn } from "@/lib/utils";
 
 export interface OverlayImage {
   url: string;
   label: string;
+  /** Keys this layer's opacity. Defaults to url; pass a stable id (e.g.
+   * the sim's job name) when the url changes under a layer, as in the
+   * slice roller, so its slider survives the swap. */
+  id?: string;
 }
 
 const MIN_ZOOM = 50;
@@ -75,11 +79,14 @@ export function ImageOverlay({ images }: { images: OverlayImage[] }) {
   const [dragging, setDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef<{ mouseX: number; mouseY: number; panX: number; panY: number } | null>(null);
-  const layers = images.map((image, i) => ({
-    ...image,
-    thumb: driveThumbnailUrl(image.url, 1600),
-    opacity: opacityOverrides[image.url] ?? (i === 0 ? 100 : 50),
-  }));
+  const layers = images.map((image, i) => {
+    const key = image.id ?? image.url;
+    return {
+      ...image,
+      key,
+      opacity: opacityOverrides[key] ?? (i === 0 ? 100 : 50),
+    };
+  });
 
   // Re-clamp pan whenever zoom changes (slider/stepper/typed/wheel), so
   // zooming back out snaps the image back into bounds instead of leaving
@@ -147,20 +154,17 @@ export function ImageOverlay({ images }: { images: OverlayImage[] }) {
             transformOrigin: "center",
           }}
         >
-          {layers.map(
-            (layer) =>
-              layer.thumb && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={layer.url}
-                  src={layer.thumb}
-                  alt={layer.label}
-                  draggable={false}
-                  style={{ opacity: layer.opacity / 100 }}
-                  className="absolute inset-0 h-full w-full object-contain"
-                />
-              ),
-          )}
+          {layers.map((layer) => (
+            <DriveImage
+              // Keyed by url (not layer.key) so a swapped image gets a fresh retry count.
+              key={layer.url}
+              url={layer.url}
+              size={1600}
+              alt={layer.label}
+              style={{ opacity: layer.opacity / 100 }}
+              className="absolute inset-0 h-full w-full object-contain"
+            />
+          ))}
         </div>
       </div>
       <div>
@@ -180,10 +184,10 @@ export function ImageOverlay({ images }: { images: OverlayImage[] }) {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {layers.map((layer) => (
           <OpacityControl
-            key={layer.url}
+            key={layer.key}
             label={layer.label}
             value={layer.opacity}
-            onChange={(v) => setOpacityOverrides((prev) => ({ ...prev, [layer.url]: v }))}
+            onChange={(v) => setOpacityOverrides((prev) => ({ ...prev, [layer.key]: v }))}
           />
         ))}
       </div>
