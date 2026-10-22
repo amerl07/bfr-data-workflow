@@ -8,6 +8,7 @@ import { formatSlicePosition, slicePositions, velocitySlices, type SliceAxis } f
 import { Slider } from "@/components/ui/slider";
 import { ImageOverlay } from "@/components/shared/image-overlay";
 import { DriveImage } from "@/components/shared/drive-image";
+import { ZoomPanViewport } from "@/components/shared/zoom-pan-viewport";
 import { EmptyState } from "@/components/status";
 import { cn } from "@/lib/utils";
 
@@ -60,12 +61,38 @@ function SlicePanel({
   url,
   name,
   missingLabel,
+  zoomable,
 }: {
   label?: string;
   url: string | null;
   name: string | null;
   missingLabel: string;
+  /** Wheel/slider zoom and drag-to-pan; the view is kept while stepping slices. */
+  zoomable: boolean;
 }) {
+  const content = url ? (
+    <DriveImage
+      key={url}
+      url={url}
+      size={THUMB_SIZE}
+      alt={name ?? "Slice"}
+      className="h-full w-full object-contain"
+      fallback={
+        <a
+          href={driveViewUrl(url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
+        >
+          <ImageOff className="h-5 w-5" />
+          Open in Drive
+        </a>
+      }
+    />
+  ) : (
+    <span className="text-xs text-slate-400">{missingLabel}</span>
+  );
+
   return (
     <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
       {label && (
@@ -73,30 +100,15 @@ function SlicePanel({
           {label}
         </p>
       )}
-      <div className="flex aspect-video items-center justify-center overflow-hidden rounded-md bg-slate-950">
-        {url ? (
-          <DriveImage
-            key={url}
-            url={url}
-            size={THUMB_SIZE}
-            alt={name ?? "Slice"}
-            className="h-full w-full object-contain"
-            fallback={
-              <a
-                href={driveViewUrl(url)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-col items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
-              >
-                <ImageOff className="h-5 w-5" />
-                Open in Drive
-              </a>
-            }
-          />
-        ) : (
-          <span className="text-xs text-slate-400">{missingLabel}</span>
-        )}
-      </div>
+      {zoomable ? (
+        <ZoomPanViewport frameClassName="aspect-video">
+          <div className="absolute inset-0 flex items-center justify-center">{content}</div>
+        </ZoomPanViewport>
+      ) : (
+        <div className="flex aspect-video items-center justify-center overflow-hidden rounded-md bg-slate-950">
+          {content}
+        </div>
+      )}
       {url && name && (
         <a
           href={driveViewUrl(url)}
@@ -269,11 +281,16 @@ export function SliceRoller({
               url={slice?.url ?? null}
               name={slice?.name ?? null}
               missingLabel={sliceSets[i].length === 0 ? "No Velocity slices in this run" : missingLabel}
+              // Single-sim only: side-by-side panels stay fixed so they line up.
+              zoomable={sims.length === 1}
             />
           ))}
         </div>
       )}
-      <p className="mt-2 text-xs text-slate-400">Click the roller, then use ← / → to step through slices.</p>
+      <p className="mt-2 text-xs text-slate-400">
+        Click the roller, then use ← / → to step through slices.
+        {sims.length === 1 && " Scroll over the image to zoom; drag to pan once zoomed in."}
+      </p>
     </section>
   );
 }
