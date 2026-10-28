@@ -29,14 +29,12 @@ public class export_fields extends StarMacro {
     // and the ground.
     static final double  Y0      = -0.1;    // m
     static final double  Z0      =  0.0;    // m (ground)
-    static final double  WIDTH   =  1.46;   // m along -y (recorded grid width)
-    static final double  HEIGHT  =  1.53;   // m along +z (recorded fluid-side height)
     static final int     RES_Y   =  40;     // grid intervals along y -> 41 points
     static final int     RES_Z   =  40;     // grid intervals along z -> 41 points
 
     static final String[] REGIONS = {"Porous Fluid", "Static Fluid"};
-    static final String[] VECTORS = {"Velocity"};   // exported as 3 components
-    static final String[] SCALARS = {"Pressure", "PressureCoefficient", "TotalPressureCoefficient"};
+    static final String[] VECTORS = {"Velocity"};   // exported as magnitude
+    static final String[] SCALARS = {"PressureCoefficient"};
 
     public void execute() {
         Simulation sim = getActiveSimulation();
@@ -60,13 +58,16 @@ public class export_fields extends StarMacro {
         grid.setPresentationName("BFR field grid");
         grid.setCoordinateSystem(sim.getCoordinateSystemManager().getLabCoordinateSystem());
         grid.getNormalCoordinate().setCoordinate(m, m, m, new DoubleVector(new double[] {1.0, 0.0, 0.0}));
+        // Size set once at the first station; after this only Origin is moved
+        // and STAR carries Point 1 / Point 2 along with it.
+        grid.getOriginCoordinate().setCoordinate(m, m, m, new DoubleVector(new double[] {X_START, Y0, Z0}));
         grid.setXResolution(RES_Y);
         grid.setYResolution(RES_Z);
         grid.getInputParts().setQuery(null);
         grid.getInputParts().setObjects(regions.toArray(new Region[0]));
 
         XyzInternalTable table = sim.getTableManager().createTable(XyzInternalTable.class);
-        table.setPresentationName("BFR field grid table");
+        table.setPresentationName("field grid table");
         table.setExtractVertexData(true);   // values at the grid points themselves
         table.getParts().setQuery(null);
         table.getParts().setObjects(grid);
@@ -79,18 +80,16 @@ public class export_fields extends StarMacro {
             String tag = String.format(Locale.ROOT, "%.2f", x);
 
             grid.getOriginCoordinate().setCoordinate(m, m, m, new DoubleVector(new double[] {x, Y0, Z0}));
-            grid.getPoint1Coordinate().setCoordinate(m, m, m, new DoubleVector(new double[] {x, Y0 - WIDTH, Z0}));
-            grid.getPoint2Coordinate().setCoordinate(m, m, m, new DoubleVector(new double[] {x, Y0, Z0 + HEIGHT}));
 
             // Same tag format as the slice scenes (Velocity_X-0.10) so the web
             // app can pair a station's CSV with its image.
             String csv = outDir + File.separator + "grid_X" + tag + ".csv";
             table.extract();
             table.export(csv, ",");
-            sim.println("[BFR] field grid x=" + tag + " -> " + csv);
+            sim.println("field grid x=" + tag + " -> " + csv);
         }
 
-        sim.println("[BFR] field export complete -> " + outDir);
+        sim.println("field export complete -> " + outDir);
     }
 
     // Field functions named in VECTORS/SCALARS; a name this sim doesn't have
@@ -100,7 +99,7 @@ public class export_fields extends StarMacro {
         for (String name : VECTORS) {
             FieldFunction ff = lookup(sim, name);
             if (ff == null) continue;
-            for (int c = 0; c < 3; c++) ffs.add(((PrimitiveFieldFunction) ff).getComponentFunction(c));
+            ffs.add(((PrimitiveFieldFunction) ff).getMagnitudeFunction());
         }
         for (String name : SCALARS) {
             FieldFunction ff = lookup(sim, name);
