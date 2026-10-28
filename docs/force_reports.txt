@@ -1,49 +1,49 @@
-# BFR report export   run: DY_RW_v6_singleBiplane_Straight_20260825_1200
+# BFR report export   run: DY_FC_Mesh30mm_Straight_20261003_0700
 # raw report values (half-car, undoubled) per BFR_CFD_Standards
 # DF sign convention: downforce reads negative
 
-Full Car CoP (Meters)                                  0.792917  m
-Full Car CoP                                          50.343937  
-Radiator MF Rate                                       0.301021  kg/s
-Inlet MF Averaged Pressure                            63.743013  Pa
-Outlet MF Averaged Pressure                           42.743019  Pa
-Pressure Drop                                         20.999994  
-Cell Count                                      38790593.000000  
-Frontal Area                                           0.562083  m^2
-UT CoP (Meters)                                        0.681927  m
-RW CoP (Meters)                                        1.746729  m
-RW Area                                                2.124155  m^2
-FW Area                                                1.145667  m^2
-UT Area                                                1.441561  m^2
-ClA                                                   -1.835702  
-CdA                                                    0.712261  
-RW DF                                                -88.890698  N
-UT DF                                                -99.757235  N
-FW DF                                                -85.876593  N
-Body DF                                                8.299255  N
-Wheel DF                                               9.208175  N
-Whisker DF                                             4.020613  N
-Full Car DF                                         -252.982685  N
-Radiator DF                                            0.268384  N
-Body Drag                                             24.790488  N
-Full Car Drag                                         98.158511  N
-FW Drag                                                8.517000  N
-RW Drag                                               42.582267  N
-UT Drag                                               11.771734  N
-Wheel Drag                                            10.171958  N
-Whisker Drag                                          -0.518958  N
-Radiator Drag                                          1.290001  N
-EL4 DF                                               -63.258899  N
-EL5 DF                                               -14.392109  N
-EL6 DF                                                -4.019094  N
-EL7 DF                                                -7.041415  N
-Endplate DF                                            0.053226  N
-Swan Neck DF                                          -0.024306  N
-Carbon Rod DF                                         -0.208101  N
-Carbon Rod Drag                                        1.097877  N
-EL4 Drag                                              12.217796  N
-EL5 Drag                                              15.574406  N
-EL6 Drag                                               9.403267  N
-EL7 Drag                                               0.386196  N
-Endplate Drag                                          3.796908  N
-Swan Neck Drag                                         0.105818  N
+Full Car CoP (Meters)                                  0.847574  m
+Full Car CoP                                          53.814250  
+Radiator MF Rate                                       0.285136  kg/s
+Inlet MF Averaged Pressure                            60.422160  Pa
+Outlet MF Averaged Pressure                           40.460558  Pa
+Pressure Drop                                         19.961602  
+Cell Count                                     111383010.000000  
+Frontal Area                                           0.560681  m^2
+UT CoP (Meters)                                        0.699749  m
+RW CoP (Meters)                                        1.734132  m
+RW Area                                                1.931224  m^2
+FW Area                                                1.145730  m^2
+UT Area                                                1.441589  m^2
+ClA                                                   -1.802021  
+CdA                                                    0.704823  
+RW DF                                                -93.235783  N
+UT DF                                                -96.127824  N
+FW DF                                                -79.617105  N
+Body DF                                                8.767313  N
+Wheel DF                                               7.901599  N
+Whisker DF                                             3.967971  N
+Full Car DF                                         -248.341022  N
+Radiator DF                                            0.265208  N
+Body Drag                                             25.121501  N
+Full Car Drag                                         97.133435  N
+FW Drag                                                7.897896  N
+RW Drag                                               41.662613  N
+UT Drag                                               11.712419  N
+Wheel Drag                                            10.500049  N
+Whisker Drag                                          -0.540480  N
+Radiator Drag                                          1.181381  N
+EL4 DF                                               -63.403317  N
+EL5 DF                                               -15.225667  N
+EL6 DF                                                -4.261293  N
+EL7 DF                                               -10.195677  N
+Endplate DF                                            0.086052  N
+Swan Neck DF                                          -0.011764  N
+Carbon Rod DF                                         -0.224115  N
+Carbon Rod Drag                                        1.047941  N
+EL4 Drag                                              12.334404  N
+EL5 Drag                                              15.600674  N
+EL6 Drag                                               9.554190  N
+EL7 Drag                                               0.734902  N
+Endplate Drag                                          2.302219  N
+Swan Neck Drag                                         0.088284  N
