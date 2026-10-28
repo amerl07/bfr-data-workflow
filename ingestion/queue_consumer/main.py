@@ -455,10 +455,9 @@ def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
     metadata = drive.files().get(fileId=file_id, fields="id, name, mimeType, parents").execute()
 
     if metadata["mimeType"] == FOLDER_MIME_TYPE:
-        # Already unzipped -- every child is already an individual Drive
+        # Already unzipped -- every file is already an individual Drive
         # file, nothing to extract or re-upload.
-        children = list_drive_children(drive, file_id)
-        filename_to_drive_id = {child["name"]: child["id"] for child in children}
+        filename_to_drive_id = list_drive_files_recursive(drive, file_id)
         force_report_id = filename_to_drive_id.get("force_reports.txt")
         force_report_text = (
             download_drive_file_text(drive, force_report_id) if force_report_id else ""
@@ -488,14 +487,13 @@ def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
     with tempfile.TemporaryDirectory() as tmp_dir:
         zip_path = download_zip(drive, file_id, file_name, tmp_dir)
         extracted_dir = unzip(zip_path, tmp_dir)
-        file_names = [p.name for p in extracted_dir.iterdir()]
+        file_names = [rel.as_posix() for rel in walk_files(extracted_dir)]
         force_report_path = extracted_dir / "force_reports.txt"
         force_report_text = (
             force_report_path.read_text() if force_report_path.exists() else ""
         )
-        uploaded = upload_extracted_images(drive, parent_id, job_label, extracted_dir)
+        filename_to_drive_id = upload_extracted_images(drive, parent_id, job_label, extracted_dir)
 
-    filename_to_drive_id = {f["name"]: f["id"] for f in uploaded}
     return file_names, filename_to_drive_id, force_report_text
 
 
@@ -512,12 +510,40 @@ def _strip_post_zip_suffix(file_name):
 
 
 def list_drive_children(drive, folder_id):
-    response = (
-        drive.files()
-        .list(q=f"'{folder_id}' in parents and trashed = false", fields="files(id, name, mimeType)")
-        .execute()
-    )
-    return response.get("files", [])
+    # Paged: files().list returns at most 100 per page by default, and a
+    # slice sweep alone can exceed that.
+    children = []
+    page_token = None
+    while True:
+        response = (
+            drive.files()
+            .list(
+                q=f"'{folder_id}' in parents and trashed = false",
+                fields="nextPageToken, files(id, name, mimeType)",
+                pageSize=1000,
+                pageToken=page_token,
+            )
+            .execute()
+        )
+        children.extend(response.get("files", []))
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            return children
+
+
+def list_drive_files_recursive(drive, folder_id, prefix=""):
+    """Maps every file under folder_id to its Drive id, keyed by its path
+    relative to folder_id (e.g. "Cp/FrontWing.png") -- the same keys
+    walk_files gives a zip, so subfolders (GROUP_SEP scene groups, a future
+    fields/) are descended into instead of listed as if they were images."""
+    files = {}
+    for child in list_drive_children(drive, folder_id):
+        rel = prefix + child["name"]
+        if child["mimeType"] == FOLDER_MIME_TYPE:
+            files.update(list_drive_files_recursive(drive, child["id"], rel + "/"))
+        else:
+            files[rel] = child["id"]
+    return files
 
 
 def download_drive_file_text(drive, file_id):
@@ -560,31 +586,51 @@ def unzip(zip_path, tmp_dir):
         # "post_<job_name>/CP_Top.png" instead of "CP_Top.png" at the zip
         # root) -- the flat-root assumption from the original sample
         # (docs/PostDotZip_FileNames.txt) doesn't universally hold. Without
-        # this, the wrapper folder is the only thing seen at this level,
-        # gets skipped (not a file) by upload_extracted_images, and every
-        # downstream field silently ends up empty instead of erroring.
+        # this, every path carries the wrapper's name as a prefix,
+        # force_reports.txt isn't found at the root, and every downstream
+        # field silently ends up empty instead of erroring.
         return entries[0]
     return extract_dir
 
 
-def upload_extracted_images(drive, parent_folder_id, job_label, local_dir):
-    folder_metadata = {
-        "name": f"{job_label}_extracted",
-        "mimeType": FOLDER_MIME_TYPE,
-        "parents": [parent_folder_id],
-    }
-    extracted_folder = drive.files().create(body=folder_metadata, fields="id").execute()
+def walk_files(local_dir):
+    """Every file under local_dir as a path relative to it, sorted, skipping
+    Finder junk at any depth."""
+    return sorted(
+        p.relative_to(local_dir)
+        for p in local_dir.rglob("*")
+        if p.is_file() and not _ZIP_JUNK_NAMES.intersection(p.relative_to(local_dir).parts)
+    )
 
-    uploaded = []
-    for path in sorted(local_dir.iterdir()):
-        if not path.is_file():
-            continue
-        media = MediaFileUpload(str(path))
-        file_metadata = {"name": path.name, "parents": [extracted_folder["id"]]}
+
+def create_drive_folder(drive, name, parent_folder_id):
+    folder_metadata = {"name": name, "mimeType": FOLDER_MIME_TYPE, "parents": [parent_folder_id]}
+    return drive.files().create(body=folder_metadata, fields="id").execute()["id"]
+
+
+def upload_extracted_images(drive, parent_folder_id, job_label, local_dir):
+    """Uploads every file under local_dir and returns {relative path: Drive
+    id}. Subfolders are mirrored in Drive rather than flattened, so
+    same-named files in different groups (Cp/FrontWing.png vs.
+    Velocity/FrontWing.png) can't collide and each Drive name stays the
+    plain basename the web app parses."""
+    folder_ids = {Path("."): create_drive_folder(drive, f"{job_label}_extracted", parent_folder_id)}
+
+    def drive_folder_for(rel_dir):
+        if rel_dir not in folder_ids:
+            folder_ids[rel_dir] = create_drive_folder(
+                drive, rel_dir.name, drive_folder_for(rel_dir.parent)
+            )
+        return folder_ids[rel_dir]
+
+    uploaded = {}
+    for rel in walk_files(local_dir):
+        media = MediaFileUpload(str(local_dir / rel))
+        file_metadata = {"name": rel.name, "parents": [drive_folder_for(rel.parent)]}
         uploaded_file = (
-            drive.files().create(body=file_metadata, media_body=media, fields="id, name").execute()
+            drive.files().create(body=file_metadata, media_body=media, fields="id").execute()
         )
-        uploaded.append(uploaded_file)
+        uploaded[rel.as_posix()] = uploaded_file["id"]
 
     return uploaded
 
