@@ -62,9 +62,12 @@ _HEADER_RUN_PATTERN = re.compile(r"run:\s*(?P<run_name>\S+)")
 # Label: letters/digits/spaces, non-greedy so it stops at the first run of
 # 2+ whitespace (the column gap) rather than consuming into it -- labels
 # observed so far only ever have single internal spaces ("Body DF", "Total
-# Aero DF"), so this correctly keeps multi-word labels intact.
+# Aero DF"), so this correctly keeps multi-word labels intact. Parentheses
+# are allowed in labels ("UT CoP (Meters)") and "^"/digits in units ("m^2")
+# -- both appear in the 2026-10 export vintage and were previously dropped
+# as UNPARSED.
 _VALUE_LINE_PATTERN = re.compile(
-    r"^(?P<label>[A-Za-z][A-Za-z0-9_ ]*?)\s{2,}(?P<value>-?\d+\.\d+)\s*(?P<unit>[A-Za-z/]*)\s*$"
+    r"^(?P<label>[A-Za-z][A-Za-z0-9_ ()]*?)\s{2,}(?P<value>-?\d+\.\d+)\s*(?P<unit>[A-Za-z/^0-9]*)\s*$"
 )
 
 
