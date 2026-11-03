@@ -82,6 +82,10 @@ export interface SimRow {
   /** Split on `;`, empty entries dropped. */
   scene_image_refs: string[];
   source_drive_folder: string;
+  /** Drive link to the processed field-grid sweep (`<job>_fields.json`, see
+   * lib/fields.ts); blank for sims without one (only STRAIGHTLINE sims
+   * exported from 2026-11 on have it). */
+  field_data_refs: string;
 }
 
 /** Keys of SimRow that hold a `number | null` — the numeric metrics. */

@@ -69,9 +69,10 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
 
 from ingestion.parsers import (
+    field_export_parser,
     folder_name_parser,
     force_reports_parser,
     sim_filename_parser,
@@ -302,7 +303,16 @@ RESULTS_FIELDS = [
     # Legacy -- no successor in the current schema, kept so existing
     # historical data isn't discarded. No longer populated going forward.
     "whisker_df",
+    # Drive link to <job>_fields.json, the processed presentation-grid sweep
+    # (field_export_parser.py). Blank for jobs with no fields/grid.json --
+    # every non-STRAIGHTLINE sim and every export before 2026-11. Last, so
+    # rows written before it existed still line up.
+    "field_data_refs",
 ]
+
+# The raw field-sweep export inside a post job. Parsed into one
+# <job>_fields.json instead of being uploaded and linked file by file.
+FIELDS_PREFIX = "fields/"
 
 
 def main():
@@ -416,8 +426,15 @@ def process_row(sheets, drive, row_number, row, ingested):
     set_status(sheets, row_number, "processing")
 
     try:
-        file_names, filename_to_drive_id, force_report_text = materialize_post_contents(
-            drive, file_id, file_name, batch_folder_id
+        (
+            file_names,
+            filename_to_drive_id,
+            force_report_text,
+            field_texts,
+            output_folder_id,
+        ) = materialize_post_contents(drive, file_id, file_name, batch_folder_id)
+        field_data_ref, field_error = process_fields(
+            drive, file_name, field_texts, output_folder_id
         )
         result_row = build_result_row(
             file_name,
@@ -426,10 +443,11 @@ def process_row(sheets, drive, row_number, row, ingested):
             file_names,
             filename_to_drive_id,
             force_report_text,
+            field_data_ref,
         )
         append_result_row(result_row)
         ingested.add(key)
-        set_status(sheets, row_number, "done")
+        set_status(sheets, row_number, f"done (fields error: {field_error})" if field_error else "done")
     except NotImplementedError as exc:
         # Expected, not a bug: one of ingestion/parsers/'s stubs. Leave the
         # row visibly blocked rather than losing track of it or fabricating
@@ -447,7 +465,10 @@ def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
     """Makes a post job's contents locally-readable and Drive-linkable
     regardless of whether it arrived as a post_<job_name>.zip or an
     already-unzipped post_<job_name> folder (BatchFolderDetector.gs cases
-    2/3 vs. 4). Returns (file_names, filename_to_drive_id, force_report_text).
+    2/3 vs. 4). Returns (file_names, filename_to_drive_id, force_report_text,
+    field_texts, output_folder_id): field_texts maps each fields/ file's
+    relative path to its text, and output_folder_id is the Drive folder
+    holding this job's files, where process_fields puts <job>_fields.json.
 
     This is deliberately independent of ingestion/parsers/'s stub status --
     downloading, unzipping, listing, and re-uploading isn't "parsing", none
@@ -465,7 +486,18 @@ def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
         force_report_text = (
             download_drive_file_text(drive, force_report_id) if force_report_id else ""
         )
-        return list(filename_to_drive_id), filename_to_drive_id, force_report_text
+        field_texts = {
+            name: download_drive_file_text(drive, drive_id)
+            for name, drive_id in filename_to_drive_id.items()
+            if name.startswith(FIELDS_PREFIX)
+        }
+        return (
+            list(filename_to_drive_id),
+            filename_to_drive_id,
+            force_report_text,
+            field_texts,
+            file_id,
+        )
 
     # Zipped: download, extract locally, then re-upload the extracted
     # images to a sibling "<job_name>_extracted" Drive folder so each one
@@ -495,9 +527,16 @@ def materialize_post_contents(drive, file_id, file_name, batch_folder_id):
         force_report_text = (
             force_report_path.read_text() if force_report_path.exists() else ""
         )
-        filename_to_drive_id = upload_extracted_images(drive, parent_id, job_label, extracted_dir)
+        field_texts = {
+            name: (extracted_dir / name).read_text(encoding="utf-8", errors="replace")
+            for name in file_names
+            if name.startswith(FIELDS_PREFIX)
+        }
+        extracted_folder_id, filename_to_drive_id = upload_extracted_images(
+            drive, parent_id, job_label, extracted_dir
+        )
 
-    return file_names, filename_to_drive_id, force_report_text
+    return file_names, filename_to_drive_id, force_report_text, field_texts, extracted_folder_id
 
 
 def _strip_post_zip_suffix(file_name):
@@ -612,11 +651,13 @@ def create_drive_folder(drive, name, parent_folder_id):
 
 
 def upload_extracted_images(drive, parent_folder_id, job_label, local_dir):
-    """Uploads every file under local_dir and returns {relative path: Drive
-    id}. Subfolders are mirrored in Drive rather than flattened, so
-    same-named files in different groups (Cp/FrontWing.png vs.
-    Velocity/FrontWing.png) can't collide and each Drive name stays the
-    plain basename the web app parses."""
+    """Uploads every file under local_dir except the raw fields/ export
+    (parsed into <job>_fields.json instead -- see process_fields) and
+    returns (extracted folder id, {relative path: Drive id}). Subfolders are
+    mirrored in Drive rather than flattened, so same-named files in
+    different groups (Cp/FrontWing.png vs. Velocity/FrontWing.png) can't
+    collide and each Drive name stays the plain basename the web app
+    parses."""
     folder_ids = {Path("."): create_drive_folder(drive, f"{job_label}_extracted", parent_folder_id)}
 
     def drive_folder_for(rel_dir):
@@ -628,6 +669,8 @@ def upload_extracted_images(drive, parent_folder_id, job_label, local_dir):
 
     uploaded = {}
     for rel in walk_files(local_dir):
+        if rel.as_posix().startswith(FIELDS_PREFIX):
+            continue
         media = MediaFileUpload(str(local_dir / rel))
         file_metadata = {"name": rel.name, "parents": [drive_folder_for(rel.parent)]}
         uploaded_file = (
@@ -635,11 +678,56 @@ def upload_extracted_images(drive, parent_folder_id, job_label, local_dir):
         )
         uploaded[rel.as_posix()] = uploaded_file["id"]
 
-    return uploaded
+    return folder_ids[Path(".")], uploaded
+
+
+def process_fields(drive, file_name, field_texts, output_folder_id):
+    """Parses the job's fields/ export (field_export_parser.py) and uploads
+    the result as <job>_fields.json next to its scene images. Returns
+    (Drive link or "", error message or None).
+
+    A bad field export doesn't fail the job: its force values and images
+    are still worth a results.csv row, so the error goes into the queue
+    status instead and field_data_refs stays blank."""
+    if not field_texts:
+        return "", None
+    job_label = _strip_post_zip_suffix(file_name)
+    try:
+        field_set = field_export_parser.parse_fields_folder(field_texts)
+        if field_set is None:
+            return "", f"{FIELDS_PREFIX} has no grid.json"
+        payload = field_export_parser.to_json(field_set, job_label)
+    except ValueError as exc:
+        print(f"Field export for {file_name} not parsed: {exc}")
+        return "", str(exc)
+
+    print(
+        f"Fields for {file_name}: {len(field_set.stations)} stations, "
+        f"{field_set.counts[0]}x{field_set.counts[1]} grid, "
+        f"{len(field_set.missing_stations)} missing, "
+        f"{field_set.duplicate_points} duplicate points"
+    )
+    media = MediaIoBaseUpload(io.BytesIO(payload.encode("utf-8")), mimetype="application/json")
+    uploaded = (
+        drive.files()
+        .create(
+            body={"name": f"{job_label}_fields.json", "parents": [output_folder_id]},
+            media_body=media,
+            fields="id",
+        )
+        .execute()
+    )
+    return f"https://drive.google.com/file/d/{uploaded['id']}/view", None
 
 
 def build_result_row(
-    file_name, batch_folder_id, batch_folder_name, file_names, filename_to_drive_id, force_report_text
+    file_name,
+    batch_folder_id,
+    batch_folder_name,
+    file_names,
+    filename_to_drive_id,
+    force_report_text,
+    field_data_ref="",
 ):
     """Runs the materialized post job through ingestion/parsers/ and
     assembles a data/results.csv row per post_zip_file_format_spec.md §7
@@ -699,6 +787,7 @@ def build_result_row(
         "swept_value_unit": swept_value_unit,
         "scene_image_refs": format_scene_image_refs(file_names, filename_to_drive_id),
         "source_drive_folder": batch_folder_id,
+        "field_data_refs": field_data_ref,
     }
     # normalize_label so this matches regardless of which confirmed label
     # spelling the source file used (underscore vs space, case, or -- as of
@@ -779,10 +868,13 @@ def format_scene_image_refs(file_names, filename_to_drive_id):
     "MISSING:<name>" rather than silently dropped, so a mismatch is visible
     in data/results.csv instead of just producing a shorter-than-expected
     list.
+
+    The raw fields/ export is skipped too: it isn't scene images, and its
+    processed form is linked from field_data_refs instead.
     """
     links = []
     for name in file_names:
-        if name == "force_reports.txt":
+        if name == "force_reports.txt" or name.startswith(FIELDS_PREFIX):
             continue
         file_id = filename_to_drive_id.get(name)
         links.append(f"https://drive.google.com/file/d/{file_id}/view" if file_id else f"MISSING:{name}")

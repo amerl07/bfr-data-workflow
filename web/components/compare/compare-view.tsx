@@ -10,6 +10,7 @@ import { MetadataDiffTable } from "@/components/compare/metadata-diff-table";
 import { PerformanceDiffTable } from "@/components/compare/performance-diff-table";
 import { CompareGalleries } from "@/components/compare/compare-galleries";
 import { SliceRoller } from "@/components/shared/slice-roller";
+import { DeltaFieldMap } from "@/components/compare/delta-field-map";
 import { LoadingState, ErrorState, EmptyState } from "@/components/status";
 import { cn } from "@/lib/utils";
 
@@ -139,6 +140,8 @@ export function CompareView() {
               ...selected.filter((r) => r.job_name !== baseline.job_name).map((r) => r.job_name),
             ]}
           />
+
+          {selected.some((r) => r.field_data_refs) && <DeltaFieldMap rows={selected} baseline={baseline} />}
 
           <section>
             <h2 className="mb-3 text-lg font-semibold">Scene Galleries</h2>

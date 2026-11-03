@@ -139,6 +139,7 @@ export function parseResultsCsv(csvText: string): SimRow[] {
 
       scene_image_refs: splitRefs(row.scene_image_refs),
       source_drive_folder: row.source_drive_folder ?? "",
+      field_data_refs: (row.field_data_refs ?? "").trim(),
     }));
 }
 

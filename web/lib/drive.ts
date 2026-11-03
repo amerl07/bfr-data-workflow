@@ -47,6 +47,16 @@ export function driveFileMetadataUrl(url: string): string | null {
   return `https://www.googleapis.com/drive/v3/files/${id}?fields=name&key=${DRIVE_API_KEY}`;
 }
 
+/** Drive API v3 download (alt=media) of a public file's contents. Unlike
+ * the drive.google.com download links, googleapis.com answers with CORS
+ * headers, so the static site can read the file from the browser. Null
+ * without an id or an API key. */
+export function driveMediaUrl(url: string): string | null {
+  const id = extractDriveFileId(url);
+  if (!id || !DRIVE_API_KEY) return null;
+  return `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${DRIVE_API_KEY}`;
+}
+
 // A file id's name never changes, so names are kept in localStorage across
 // visits; otherwise every page load re-asks Drive (no-store) for every
 // image, ~90 requests per sim, before galleries can sort or the slice
