@@ -67,6 +67,7 @@ export function makeRow(overrides: Partial<SimRow> = {}): SimRow {
     swept_value_unit: "",
     scene_image_refs: [],
     source_drive_folder: "",
+    field_data_refs: "",
     ...overrides,
   };
 }
