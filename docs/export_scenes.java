@@ -100,7 +100,7 @@ public class export_scenes extends StarMacro {
         // STRAIGHTLINE sims only; every other sweep type skips it.
         if (isStraightLine(runId)) {
             try {
-                exportFields(sim, outDir + File.separator + "fields");
+                exportFields(sim, runId, outDir + File.separator + "fields");
             } catch (Exception e) {
                 sim.println("[BFR] field export FAILED: " + e.getMessage());
             }
@@ -118,7 +118,9 @@ public class export_scenes extends StarMacro {
     //   - the grid's "Origin" is a CORNER: the plane spans origin -> Point 1 and
     //     origin -> Point 2 (here y = -0.717..0.717 m, z = -1.530..1.530 m)
     //   - grid points outside the fluid are left out of the export (no NaN rows)
-    private void exportFields(Simulation simulation_0, String outDir) {
+    // fields/grid.json is written first and describes the whole sweep, so the
+    // consumer (ingestion/parsers/field_export_parser.py) has nothing hard-coded.
+    private void exportFields(Simulation simulation_0, String runId, String outDir) throws IOException {
         new File(outDir).mkdirs();
 
         Units units_0 =
@@ -134,13 +136,15 @@ public class export_scenes extends StarMacro {
         XyzInternalTable table = simulation_0.getTableManager().createTable(XyzInternalTable.class);
         table.setPresentationName("field grid table");
         table.setExtractVertexData(true);   // values at the grid points themselves
-        table.setFieldFunctions(fieldFunctions(simulation_0));
+        List<String> fieldNames = new ArrayList<>();
+        table.setFieldFunctions(fieldFunctions(simulation_0, fieldNames));
 
         int n = (int) Math.round((X_END - X_START) / X_STEP) + 1;
+        writeGridJson(outDir + File.separator + "grid.json", runId, n, fieldNames);
+
         for (int i = 0; i < n; i++) {
-            // Rounded so float drift can't print -0.00 or 0.0999999.
-            double x = Math.round((X_START + i * X_STEP) * 1000) / 1000.0 + 0.0;
-            String tag = String.format(Locale.ROOT, "%.2f", x);
+            double x = stationX(i);
+            String tag = stationTag(x);
 
             // ---- recorded grid setup (presentationGrid_del.java), x substituted ----
             PlaneProbePart planeProbePart =
@@ -187,7 +191,7 @@ public class export_scenes extends StarMacro {
 
             // Same tag format as the slice scenes (Velocity_X-0.10) so the web
             // app can pair a station's CSV with its image.
-            String csv = outDir + File.separator + "grid_X" + tag + ".csv";
+            String csv = outDir + File.separator + stationFile(tag);
             table.getParts().setQuery(null);
             table.getParts().setObjects(planeProbePart);
             table.extract();
@@ -214,18 +218,80 @@ public class export_scenes extends StarMacro {
         return sweep.equals("STRAIGHTLINE") || sweep.equals("STRAIGHT");
     }
 
+    // Rounded so float drift can't print -0.00 or 0.0999999.
+    private static double stationX(int i) {
+        return Math.round((X_START + i * X_STEP) * 1000) / 1000.0 + 0.0;
+    }
+
+    private static String stationTag(double x) {
+        return String.format(Locale.ROOT, "%.2f", x);
+    }
+
+    private static String stationFile(String tag) {
+        return "grid_X" + tag + ".csv";
+    }
+
+    // Plane coordinates are (y, z) pairs; x is each station's own. "resolution"
+    // is passed straight through from setX/YResolution -- whether STAR puts
+    // that many points or that many cells per side is left to the parser.
+    private void writeGridJson(String path, String runId, int n, List<String> fieldNames)
+            throws IOException {
+        StringBuilder st = new StringBuilder();
+        for (int i = 0; i < n; i++) {
+            double x = stationX(i);
+            if (i > 0) st.append(",\n");
+            st.append("    {\"x\": ").append(x)
+              .append(", \"file\": ").append(jsonString(stationFile(stationTag(x)))).append("}");
+        }
+        try (PrintWriter w = new PrintWriter(new FileWriter(path))) {
+            w.println("{");
+            w.println("  \"version\": 1,");
+            w.println("  \"run\": " + jsonString(runId) + ",");
+            w.println("  \"normal_axis\": \"x\",");
+            w.println("  \"units\": \"m\",");
+            w.println("  \"origin_yz\": [" + (-Y_HALF) + ", " + Z_HALF + "],");
+            w.println("  \"point1_yz\": [" + (-Y_HALF) + ", " + (-Z_HALF) + "],");
+            w.println("  \"point2_yz\": [" + Y_HALF + ", " + Z_HALF + "],");
+            w.println("  \"resolution\": [" + RES_X + ", " + RES_Y + "],");
+            w.println("  \"regions\": " + jsonArray(Arrays.asList(REGIONS)) + ",");
+            w.println("  \"fields\": " + jsonArray(fieldNames) + ",");
+            w.println("  \"stations\": [");
+            w.println(st);
+            w.println("  ]");
+            w.println("}");
+        }
+    }
+
+    private static String jsonString(String s) {
+        return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private static String jsonArray(List<String> items) {
+        StringBuilder b = new StringBuilder("[");
+        for (int i = 0; i < items.size(); i++) {
+            if (i > 0) b.append(", ");
+            b.append(jsonString(items.get(i)));
+        }
+        return b.append("]").toString();
+    }
+
     // Field functions named in VECTORS/SCALARS; a name this sim doesn't have
-    // is skipped with a warning instead of aborting the sweep.
-    private NeoObjectVector fieldFunctions(Simulation sim) {
+    // is skipped with a warning instead of aborting the sweep. The exported
+    // functions' presentation names (the CSV column names) go into names.
+    private NeoObjectVector fieldFunctions(Simulation sim, List<String> names) {
         List<Object> ffs = new ArrayList<>();
         for (String name : VECTORS) {
             FieldFunction ff = lookup(sim, name);
             if (ff == null) continue;
-            ffs.add(((PrimitiveFieldFunction) ff).getMagnitudeFunction());
+            FieldFunction mag = ((PrimitiveFieldFunction) ff).getMagnitudeFunction();
+            ffs.add(mag);
+            names.add(mag.getPresentationName());
         }
         for (String name : SCALARS) {
             FieldFunction ff = lookup(sim, name);
-            if (ff != null) ffs.add(ff);
+            if (ff == null) continue;
+            ffs.add(ff);
+            names.add(ff.getPresentationName());
         }
         return new NeoObjectVector(ffs.toArray());
     }
