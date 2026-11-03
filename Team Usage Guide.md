@@ -1,160 +1,117 @@
 # BFR Aero Data Workflow — Team Guide
-Last updated: October 6, 2026 - Yumo Liu
+Last updated: November 3, 2026 - Yumo Liu
 
-This is the short version: how to get your sim results into the shared
-database and how to find them again. For full technical reference see
-https://github.com/amerl07/bfr-data-workflow.
+How to get your sim results into the shared database and find them again.
+Full technical reference: https://github.com/amerl07/bfr-data-workflow.
 
 # Quick Links
 **Drop-off Folder**: https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
 
-**Process Queue Sheet**: https://docs.google.com/spreadsheets/d/1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ/edit 
+**Process Queue Sheet**: https://docs.google.com/spreadsheets/d/1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ/edit
 
-**Web Database**: https://amerl07.github.io/bfr-data-workflow/ 
+**Web Database**: https://amerl07.github.io/bfr-data-workflow/
 
 ## 1. Workflow
 
-1. **Run your sim** on Sabalcore as usual. See https://docs.google.com/document/d/1hN6mHg-wJhHBhw11GJ4ZimBdNPMyy06pYu70YtxgMXE/edit?usp=sharing
-   
-2. **Name the job** using the naming convention below (see §2) — this
-   matters since the job name is baked into the
-   `post.zip` filename and that's how everything downstream (component,
-   sweep type, owner, date) gets parsed out automatically. There's no way
-   to fix it afterwards except uploading again with the right name.
+1. **Name your job** using the convention in §2 *before* submitting. The
+   name is how component, sweep type, owner and date get filled in, and it
+   can't be fixed afterwards without re-uploading.
+2. **Run your sim** on Sabalcore as usual. See https://docs.google.com/document/d/1hN6mHg-wJhHBhw11GJ4ZimBdNPMyy06pYu70YtxgMXE/edit?usp=sharing
+3. **That's it for single runs.** Every few minutes a harvester uploads
+   finished runs' `post.zip` to the drop-off folder, the pipeline detects
+   it, parses the force report, uploads your scene images, and adds the run
+   to the web app. STRAIGHTLINE runs also export field data, used by the
+   Field Delta view (§4).
+   - The harvester only takes job names ending in a `_YYYYMMDD` date on or
+     after Sept 30, 2026. Otherwise, download `post_<job_name>.zip` from
+     the relay app and drop it loose into the drop-off folder yourself.
 
-3. **Getting `post_<job_name>.zip` into Drive is automatic** for single
-   runs: a harvester checks Sabalcore every few minutes and uploads each
-   finished run's `post.zip` loose into the watched Drive folder for you —
-   no need to download it from the relay app. It only picks up runs whose
-   job name ends in a `_YYYYMMDD` date on or after Sept 30, 2026, so name
-   your job correctly *before* submitting (§2).
+**Running a sweep** (several sims, one parameter changing, e.g. mesh base
+size 30/35/40mm): in the drop-off folder, create a plain Drive **folder**
+named `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` and
+put each run's `post_<job_name>.zip` inside it, with the value+unit at the
+end of its DESCRIPTION:
+```
+YL_FC_MeshBase_Straight_20260913/                       <- the sweep folder
+├── post_YL_FC_MeshBase30mm_Straight_20260913.zip
+├── post_YL_FC_MeshBase35mm_Straight_20260913.zip
+└── post_YL_FC_MeshBase40mm_Straight_20260913.zip
+```
+- `SWEPTVARIABLE` is the thing being varied (`MeshBase`), not a value.
+- The folder gets **no** `post_` prefix and is **not** zipped.
+- ⚠️ The harvester doesn't know about sweeps yet and uploads every run
+  loose. If your sweep's zips were harvested before you grouped them, ping
+  Yumo to regroup them.
 
-   **Dropping it by hand still works** (and is needed if your job name has
-   no trailing date): download `post_<job_name>.zip` from the relay app and
-   drop it loose into the shared watched Drive folder:
-   https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
-   If you drop it before the harvester gets to it, the harvester skips it.
-
-   **Running a sweep** (several sims, one parameter changing between them —
-   e.g. mesh base size at 30mm/35mm/40mm): create a **folder** (not a zip)
-   named
-   `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` (e.g.
-   `YL_FC_MeshBase_Straight_20260913` — note: `SWEPTVARIABLE` is the name of
-   the thing being varied, e.g. `MeshBase`, not one of its values) directly
-   in the drop-off folder above, and drop your **separate**
-   `post_<job_name>.zip` files inside it — one per swept value, each named
-   the normal way but with the value+unit appended to its own
-   `DESCRIPTION` field, e.g.:
-   ```
-   YL_FC_MeshBase_Straight_20260913/                       <- the sweep folder
-   ├── post_YL_FC_MeshBase30mm_Straight_20260913.zip
-   ├── post_YL_FC_MeshBase35mm_Straight_20260913.zip
-   └── post_YL_FC_MeshBase40mm_Straight_20260913.zip
-   ```
-   The web app will then show them together as a batch on each sim's detail
-   page (See `CONTRIBUTING.md` §1b for the full rules).
-
-   ⚠️ **The harvester doesn't know about sweeps yet** — it uploads every
-   run loose, never into a sweep folder. If your sweep's zips were
-   harvested loose before you could put them in the sweep folder, ping
-   Yumo to regroup them.
-
-   ⚠️ **Do NOT put `post_` on the sweep folder's own name, and do NOT zip
-   the sweep folder itself. The sweep folder is a plain Drive folder named
-   `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` — no
-   `post_` prefix, no `.zip` — and only the individual value files inside it
-   get the usual `post_<job_name>.zip` treatment.
-
-4. **Detection is automatic**, usually within about a minute. A row
-   appears in the Processing Queue sheet (see §3) with status `pending`.
-5. **Processing is also automatic** from there — it downloads your
-   `post.zip`, parses the force report, and re-uploads your scene images
-   so they're individually viewable. When it's done, the row's status
-   flips to `done` and your run shows up in the database.
-6. **Browse it** on the web app (see §4) — no manual step needed there
-   either, it always reflects the latest data.
+The web app then shows them together as a batch. Full rules:
+`CONTRIBUTING.md` §1b.
 
 ## 2. Naming convention
-This is easiest if the convention is followed when you upload the sim to Sabalcore, as you won't be needing to change the name after the job finishes. If not, the harvester may skip it or its upload may fail to parse — modify the name to follow the `post.zip` pattern below and drop it into Drive by hand.
-
-Job names to Sabalcore follow one fixed pattern:
 
 ```
 {INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}
 ```
+The `post.zip` is the same with `post_` in front, e.g.
+`post_NC_UT_NoFillets_Cornering_20260724.zip`.
 
-and the `post.zip` you upload just wraps that:
+- All five fields, in order, separated by single underscores. No
+  underscores or spaces *within* a field (`NoFillets`, not `No_Fillets`).
+- **Initials**: fixed per person, see `CONTRIBUTING.md` §5.
+- **Component**: `RW` (rear wing), `FW` (front wing), `UT` (undertray),
+  `WSK` (whisker), `BW` (bodywork), `FC` (full car).
+  - Parts of or attachments to a device use that device's code (e.g. `RW`
+    for endplates, `FW` for footplates).
+  - Use `FC` for sims that aren't iterating on one device (pitch sweeps,
+    velocity sweeps, etc.).
+- **Description**: free text, e.g. `NoFillets`, `Outwash`, `Baseline`.
+- **Sweep type**: `CORNERING` or `STRAIGHTLINE`. (`VEL`, `YAW`, `RH`,
+  `AOA`, `COMBO` aren't supported yet; use `FC` as above.)
+- **Date**: `YYYYMMDD`.
 
-```
-post_{INITIALS}_{COMPONENT}_{DESCRIPTION}_{SWEEPTYPE}_{YYYYMMDD}.zip
-```
-
-**Examples:**
-```
-post_NC_UT_NoFillets_Cornering_20260724.zip
-post_YL_WSK_VariableAoA_Straightline_20260529.zip
-```
-
-**Rules of thumb:**
-- All five fields are required, in that order, separated by single
-  underscores — no underscores *within* a field (write `NoFillets`, not
-  `No_Fillets`).
-- **Initials** are fixed per person — see `CONTRIBUTING.md` §5 for the full
-  registry.
-- **Component** — one of: `RW` (rear wing), `FW` (front wing), `UT`
-  (undertray), `WSK` (whisker), `BW` (bodywork), `FC` (full car). If the simulation is not for testing and iteration of one specific aero device (eg. pitch-angle sweeps, velocity sweeps, etc), use `FC`.
-  - Note: If you are designing parts of or attachments to another device, use the component code of the main device. Eg. Use RW for endplates, FW for footplates, 
-- **Description** — free text, your call, just NO UNDERSCORES or SPACES
-  (e.g. `NoFillets`, `Outwash`, `Baseline`).
-- **Sweep type** — one of: `CORNERING`, `STRAIGHTLINE`
-  - NOT yet implemented: `VEL` (velocity), `YAW`, `RH` (ride height), `AOA` (angle of attack), `COMBO` (multi-parameter). Per the "Component" bullet, use FC component code instead.
-- **Date** — `YYYYMMDD`.
-- Unrecognized component/sweep-type codes won't break anything — they'll
-  just show up as-is in the database instead of a "known" category. Still,
-  try to stick to the lists above so filtering/grouping stays clean for
-  everyone.
+Unknown codes won't break anything; they just show up as-is instead of as a
+known category. Stick to the lists so filtering stays clean.
 
 ## 3. Checking status
 
-The Processing Queue sheet is for checking "did my upload go through":
-https://docs.google.com/spreadsheets/d/1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ/edit
+Use the Processing Queue sheet to check whether your upload went through.
+Each row's `status` moves through:
 
-Each row's `status` column moves through:
+- `pending`: detected, waiting to be processed.
+- `processing`: being worked on.
+- `done`: in the database.
+- `blocked: <reason>`: hit a known unsupported case.
+- `error: <reason>`: something went wrong. Flag it to Yumo if the fix
+  isn't obvious.
 
-- `pending` — detected, waiting to be processed.
-- `processing` — actively being worked on.
-- `done` — succeeded, should be in the database.
-- `blocked: <reason>` — hit a known limitation (e.g. something not
-  supported yet).
-- `error: <reason>` — something went wrong. Check the reason, and flag it
-  to Yumo if it's not obvious what to fix on your end.
-
-**Known rough edge (being worked on):** status updates aren't instant. The
-detection is quick (~1 min), but a row can sit at `pending` on the queue sheet for a while before actually being picked up and processed. If your run isn't showing up on the web app yet, check this sheet first before assuming something's broken.
+Detection takes about a minute, but processing runs every ~5 minutes, so a
+row can sit at `pending` for a bit. If your run isn't on the web app yet,
+check here first.
 
 ## 4. Using the web app
 
-Once your run is `done`, everything's queryable at:
-**https://amerl07.github.io/bfr-data-workflow/**
+**https://amerl07.github.io/bfr-data-workflow/**. New `done` runs appear on
+a page reload.
 
-Five sections, linked from the top nav bar:
-
-- **Explorer** (home page) — search and filter every simulation (by
-  component, sweep type, owner, date, performance ranges, etc.), in either
-  a card or table view. Export whatever you've filtered down to as CSV.
-- **Simulation Detail** — click into any run for its full force breakdown,
-  scene image gallery, raw data, and source files.
-- **Compare** — pick any two simulations and see a side-by-side diff of
-  their metadata and performance, with better/worse highlighted.
-- **Performance Explorer** — an interactive scatter plot across the whole
-  database; pick what goes on each axis, color, and marker size.
-- **Analytics Dashboard** — team-wide summary stats, distributions, a
-  correlation matrix, and leaderboards (highest downforce, lowest drag,
-  etc.).
-
-The data refreshes on its own — you don't need to redeploy or refresh
-anything for a new `done` run to show up, just reload the page.
+- **Explorer** (home): search and filter every sim (component, sweep type,
+  owner, date, performance ranges), in card or table view, newest first by
+  default. Star sims and filter to starred. Export results as CSV.
+- **Simulation Detail**: full force breakdown, scene image gallery
+  (searchable by name), raw data, source files, and a **Velocity slice
+  roller** to step through slice images with zoom/pan.
+- **Compare**: pick **two or more** sims and choose one as the baseline;
+  all deltas are against it. Includes:
+  - side-by-side metadata/performance with better/worse highlighted
+  - scene galleries, and an image overlay to layer one image per sim
+  - a slice roller stepping every sim's slices together
+  - **Field Delta** (STRAIGHTLINE sims with field data): baseline, other
+    sim, and difference heatmaps at one X position, with a slider for
+    position and a picker for the field variable
+- **Performance Explorer**: scatter plot across the whole database; pick
+  the axes, color and marker size.
+- **Analytics Dashboard**: team-wide stats, distributions, a correlation
+  matrix, and leaderboards.
 
 ## 5. Questions, bugs, suggestions
 
-Direct all questions **Yumo Liu** (liuyumo@berkeley.edu / liuyumo422@gmail.com). If something looks wrong (a stuck queue row, a bad parse, a confusing bit of the web app) or you have an idea for what'd make this more useful let me know.
+Contact **Yumo Liu** (liuyumo@berkeley.edu / liuyumo422@gmail.com) about
+stuck queue rows, bad parses, anything confusing in the web app, or ideas.
