@@ -106,6 +106,8 @@ a page reload.
   - **Field Delta** (STRAIGHTLINE sims with field data): baseline, other
     sim, and difference heatmaps at one X position, with a slider for
     position and a picker for the field variable
+    - This feature is not available for earlier sims, since these earlier
+      sims did not run through this updated parser.
 - **Performance Explorer**: scatter plot across the whole database; pick
   the axes, color and marker size.
 - **Analytics Dashboard**: team-wide stats, distributions, a correlation
