@@ -5,7 +5,7 @@ How to get your sim results into the shared database and find them again.
 Full technical reference: https://github.com/amerl07/bfr-data-workflow.
 
 # Quick Links
-**Drop-off Folder**: https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
+**Drop-off Folder** (use this only when autoparsing didn't work): https://drive.google.com/drive/folders/1XhrMoU9ermfWZocgzl05-cHdmZexGKih
 
 **Process Queue Sheet**: https://docs.google.com/spreadsheets/d/1wsy2Wxk_wnQJ9HZp4YuSpW2W9VJ84CxjgcmKxb90JYQ/edit
 
@@ -17,7 +17,7 @@ Full technical reference: https://github.com/amerl07/bfr-data-workflow.
    name is how component, sweep type, owner and date get filled in, and it
    can't be fixed afterwards without re-uploading.
 2. **Run your sim** on Sabalcore as usual. See https://docs.google.com/document/d/1hN6mHg-wJhHBhw11GJ4ZimBdNPMyy06pYu70YtxgMXE/edit?usp=sharing
-3. **That's it for single runs.** Every few minutes a harvester uploads
+3. Every few minutes a harvester uploads
    finished runs' `post.zip` to the drop-off folder, the pipeline detects
    it, parses the force report, uploads your scene images, and adds the run
    to the web app. STRAIGHTLINE runs also export field data, used by the
@@ -26,7 +26,7 @@ Full technical reference: https://github.com/amerl07/bfr-data-workflow.
      after Sept 30, 2026. Otherwise, download `post_<job_name>.zip` from
      the relay app and drop it loose into the drop-off folder yourself.
 
-**Running a sweep** (several sims, one parameter changing, e.g. mesh base
+**If you are Running a SWEEP (submitting multiple related sims)** (several sims, one parameter changing, e.g. mesh base
 size 30/35/40mm): in the drop-off folder, create a plain Drive **folder**
 named `{INITIALS}_{COMPONENT}_{SWEPTVARIABLE}_{SWEEPTYPE}_{YYYYMMDD}` and
 put each run's `post_<job_name>.zip` inside it, with the value+unit at the
